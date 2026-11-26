@@ -4,7 +4,7 @@ importScripts('version.js');
 const CACHE = 'plant3d-' + self.P3D_VERSION;
 const FILES = [
   './', 'index.html', 'version.js', 'pwa.js', 'manifest.webmanifest',
-  'iso2d3d.js', 'vendor/three.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js',
+  'iso2d3d.js', 'isovec.js', 'vendor/three.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'
 ];
 self.addEventListener('install', e => {

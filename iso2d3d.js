@@ -421,14 +421,12 @@ RULES
     R.runs.forEach(r => { if (r.start && r.start.equip && r.start.equip.tag) eqTags.push(r.start.equip.tag); r.steps.forEach(p => { if ((p.t === 'tee' || p.t === 'tee_in') && p.id) teeIds.push(p.id); if (p.t === 'equip' && p.tag && !eqTags.includes(p.tag)) eqTags.push(p.tag); }); });
     const startOpts = [['origin', '원점 (첫 구간)'], ['equip', '장치에서 시작 (첫 구간)']].concat(eqTags.map(t => ['nozzle:' + t, t + ' 노즐에서'])).concat(teeIds.map(i => ['tee:' + i, '티 ' + i + ' 에서'])).concat(runIds.flatMap(i => [['start_of:' + i, i + ' 시작점에서 (반대 방향)'], ['end_of:' + i, i + ' 끝점에서']]));
     const lowN = R.runs.reduce((a, r) => a + r.steps.filter(p => p.conf === 'low').length, 0);
-    const h = `<div class="tbw">
- <div class="tbimg"><div class="row"><button data-tr="zoom">확대/축소</button><span class="mut">도면을 보면서 오른쪽 표를 확인하세요.</span></div><div class="tbcv"><canvas id="tbcv"></canvas></div></div>
- <div class="tbr">
+    const h = `
   <div class="row"><button data-att="back">← 첨부 목록</button><span style="flex:1"></span><button data-tr="build" class="pri">3D에 반영</button><button data-tr="iso">ISO 보기</button><button data-tr="show">3D에서 보기</button></div>
   <div id="tbmsg" class="mut"></div>
   ${R.summary ? `<details open><summary>AI 판독 요약${R.model ? ' (' + E(R.model) + ')' : ''}</summary><div class="mut" style="white-space:pre-wrap">${E(R.summary)}</div></details>` : ''}
   ${(R.notes || []).length ? `<div class="notes"><b>확인이 필요한 부분</b><ul>${R.notes.map(n => `<li>${E(n)}</li>`).join('')}</ul></div>` : ''}
-  ${lowN ? `<div class="mut">노란 줄 ${lowN}개는 AI가 추정한 값입니다. 도면과 비교해 확인해 주세요.</div>` : ''}
+  ${lowN ? `<div class="mut">노란 줄 ${lowN}개는 추정값(AI 판독·자동 추출·클릭 어림)입니다. 도면 치수와 비교해 고쳐 주세요.</div>` : ''}
   <div class="row tbh"><label>라인 번호 <input data-h="line_no" value="${E(R.line_no || '')}" style="width:220px"></label><label>제목 <input data-h="title" value="${E(R.title || '')}" style="width:220px"></label><label>기본 사이즈 <select data-h="nps">${opt(SIZES.map(v => [v, nf(v)]), R.nps || 4)}</select></label><label>Class <select data-h="cls">${opt([150, 300, 400, 600, 900, 1500, 2500], R.cls || 150)}</select></label></div>
   ${R.runs.map((r, ri) => `<div class="run${r.existing ? ' exr' : ''}">
    <div class="row"><b>${E(r.id || 'R' + (ri + 1))}</b>
@@ -443,14 +441,165 @@ RULES
    ${r.steps.map((p, si) => rowHtml(ri, si, p, em[ri + '.' + si])).join('')}</table>
    <div class="row"><button data-tr="add" data-ri="${ri}">＋ 항목 추가</button></div></div>`).join('')}
   <div class="row"><button data-tr="radd">＋ 구간(Run) 추가</button></div>
-  <details><summary>거리 입력 규칙</summary><div class="mut">각 항목의 거리는 <b>바로 앞 기준점</b>(구간 시작점, 앞 엘보 꺾이는 점, 플랜지 조인트 중심, 티 중심, 밸브 중심, 레듀서 중심)부터 잰 값입니다. 도면 치수를 그대로 넣으면 됩니다. 방향은 도면 화면 기준: 왼쪽 위 = -X, 오른쪽 아래 = +X, 오른쪽 위 = -Z, 왼쪽 아래 = +Z, 위 = +Y, 아래 = -Y.</div></details>
- </div></div>`;
-    P.ov('확인표 — ' + (T.f ? T.f.name : '직접 입력'), h);
-    $('iso3').hidden = true; $('isop').hidden = true;
-    if (T.f) drawRef();
+  <details><summary>거리 입력 규칙</summary><div class="mut">각 항목의 거리는 <b>바로 앞 기준점</b>(구간 시작점, 앞 엘보 꺾이는 점, 플랜지 조인트 중심, 티 중심, 밸브 중심, 레듀서 중심)부터 잰 값입니다. 도면 치수를 그대로 넣으면 됩니다. 방향은 도면 화면 기준: 왼쪽 위 = -X, 오른쪽 아래 = +X, 오른쪽 위 = -Z, 왼쪽 아래 = +Z, 위 = +Y, 아래 = -Y.</div></details>`;
+    const key = T.src;
+    if (!$('tbr') || T.shown !== key || !document.getElementById('iso') || document.getElementById('iso').hidden) {
+      const tools = [['start', '① 시작점'], ['elbow', '꺾임'], ['flange', '플랜지'], ['valve', '밸브'], ['tee', '티'], ['reducer', '레듀서'], ['inst', '계기'], ['equip', '장치'], ['end', '끝']];
+      const left = T.f ? `<div class="tbimg">
+  <div class="row tbtools">${T.f.type === 'application/pdf' ? '<button data-tr="auto" class="pri">선 자동 추출</button>' : ''}${tools.map(([k, l]) => `<button data-tool="${k}"${T.tool === k ? ' class="on"' : ''}>${l}</button>`).join('')}<select id="tbvt">${opt(Object.entries(P.VT), T.vt || 'gate')}</select><button data-tr="undo">↶ 취소</button><button data-tr="zoom">확대/축소</button></div>
+  <div class="mut" id="tbhint"></div>
+  <div class="tbcv"><div class="cvw"><canvas id="tbcv"></canvas><canvas id="tbov"></canvas><div id="tbin" hidden><input type="number" id="tbinv" step="10"><span class="mut">mm · Enter</span></div></div></div></div>`
+        : `<div class="tbimg"><p class="mut">직접 입력 모드입니다. 도면 위에서 클릭으로 그리려면 "ISO 첨부"에서 도면을 올린 뒤 그 도면의 "확인표 열기"를 쓰세요.</p></div>`;
+      P.ov('확인표 — ' + (T.f ? T.f.name : '직접 입력'), `<div class="tbw">${left}<div class="tbr" id="tbr"></div></div>`);
+      $('iso3').hidden = true; $('isop').hidden = true;
+      T.shown = key;
+      $('tbr').innerHTML = h;
+      if (T.f) { drawRef(); bindTrace(); }
+    } else $('tbr').innerHTML = h;
+    hint(); drawOv();
+    if (T.lastMsg && $('tbmsg')) $('tbmsg').textContent = T.lastMsg;
   }
   let zoomBig = false;
-  function drawRef() { const cv = $('tbcv'); if (!cv || !T.f) return; cv.style.width = zoomBig ? 'auto' : '100%'; P.drawFile(T.f, cv, zoomBig ? 2400 : 1400); }
+  async function drawRef() {
+    const cv = $('tbcv'); if (!cv || !T.f) return;
+    const w = zoomBig ? 2600 : 1500;
+    cv.parentElement.style.width = zoomBig ? w + 'px' : '100%';
+    await P.drawFile(T.f, cv, w);
+    if (!T.pageW) T.pageW = T.f.type === 'application/pdf' ? await pdfPageW(T.f) : cv.width;
+    const ov = $('tbov'); if (ov) { ov.width = cv.width; ov.height = cv.height; }
+    drawOv();
+  }
+  async function pdfPageW(f) { try { const L = await P.pdfLib(), d = await L.getDocument({ data: new Uint8Array(await f.blob.arrayBuffer()) }).promise, pg = await d.getPage(1); return pg.getViewport({ scale: 1 }).width; } catch (e) { return 842; } }
+
+  /* ---------------- 도면 위 클릭으로 따라 그리기 ---------------- */
+  const SCR = { '+X': [0.866, 0.5], '-X': [-0.866, -0.5], '+Z': [-0.866, 0.5], '-Z': [0.866, -0.5], '+Y': [0, -1], '-Y': [0, 1] };
+  const TOOLHINT = {
+    start: '배관이 시작하는 점(기존 배관 연결점, 장치 노즐 등)을 클릭하세요. 티 위를 클릭하면 그 티에서 분기가 시작됩니다.',
+    elbow: '꺾이는 점(엘보 모서리)을 클릭하세요. 방향은 자동으로 정해집니다.', flange: '플랜지 기호 위치를 클릭하세요.', valve: '밸브 중심을 클릭하세요. 종류는 옆 목록에서 고릅니다.',
+    tee: '티(분기점)를 클릭하세요. 분기는 나중에 "① 시작점"으로 이 티를 클릭해 그립니다.', reducer: '레듀서 중심을 클릭하세요.', inst: '계기 위치(구간 끝)를 클릭하세요.', equip: '장치 노즐(구간 끝)을 클릭하세요.', end: '배관이 끝나는 점을 클릭하세요.'
+  };
+  function hint() {
+    const el = $('tbhint'); if (!el) return;
+    const r = T.R.runs[T.cur];
+    el.textContent = T.tool ? (TOOLHINT[T.tool] + (T.tool !== 'start' && !(r && r._p0) ? ' — 먼저 "① 시작점"을 찍으세요.' : '')) : (T.f && T.f.type === 'application/pdf' ? '"선 자동 추출"로 표를 채우거나, 도구를 고른 뒤 도면을 클릭해 배관을 따라 그리세요. 클릭할 때마다 치수 입력칸이 뜹니다.' : '도구를 고른 뒤 도면을 클릭해 배관을 따라 그리세요. 클릭할 때마다 치수 입력칸이 뜹니다.');
+  }
+  const unit = () => (T.pageW || 842) / 842;              // 도면 단위 보정(이미지일 때)
+  const toPage = (cv, e) => { const b = cv.getBoundingClientRect(), k = (T.pageW || cv.width) / cv.width; return [(e.clientX - b.left) * cv.width / b.width * k, (e.clientY - b.top) * cv.height / b.height * k]; };
+  const pdist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  function runDirAt(r) { let d = r.dir || ''; (r.steps || []).forEach(p => { if (p.t === 'elbow' && p.to) d = p.to; if (p.t === 'tee_in' && p.run) d = p.run; }); return d; }
+  function lastPt(r) { for (let i = r.steps.length - 1; i >= 0; i--) if (r.steps[i]._p) return r.steps[i]._p; return r._p0; }
+  function nearestDir(v) { let best = null, bv = -2; const L = Math.hypot(v[0], v[1]) || 1; Object.entries(SCR).forEach(([k, a]) => { const d = (v[0] * a[0] + v[1] * a[1]) / L; if (d > bv) { bv = d; best = k; } }); return best; }
+  function snapPt(p) {
+    const tol = 7 * unit(); let best = null, bd = tol;
+    const cand = (T.ext ? T.ext.snaps : []).concat(T.R.runs.flatMap(r => [r._p0].concat(r.steps.map(s => s._p))).filter(Boolean));
+    cand.forEach(q => { const d = pdist(p, q); if (d < bd) { bd = d; best = q; } });
+    return best ? best.slice() : p;
+  }
+  function bindTrace() {
+    const ov = $('tbov'); if (!ov) return;
+    ov.onclick = e => traceClick(toPage(ov, e));
+    const inp = $('tbinv');
+    inp.onkeydown = e => { if (e.key === 'Enter') { setD(inp.value); } else if (e.key === 'Escape') { $('tbin').hidden = true; } };
+    $('tbvt').onchange = e => { T.vt = e.target.value; };
+  }
+  function setD(v) {
+    const b = $('tbin'); b.hidden = true;
+    const st = T.pending; T.pending = null;
+    if (st && v !== '' && +v > 0) { st.d = +v; delete st.conf; delete st.est; }
+    persist(); render(T.lastErrs);
+  }
+  function traceClick(p0) {
+    const R = T.R, tool = T.tool;
+    if (!tool) { msg('위쪽 도구 버튼을 먼저 고르세요.'); return; }
+    let p = snapPt(p0);
+    if (tool === 'start') {
+      const teeHit = R.runs.flatMap(r => r.steps.filter(s => (s.t === 'tee' || s.t === 'tee_in') && s._p && s.id)).find(s => pdist(s._p, p) < 8 * unit());
+      let ri = R.runs.findIndex(r => !r.steps.length && !r._p0);
+      if (ri < 0) { if (R.runs.length === 1 && !R.runs[0]._p0 && R.runs[0].steps.length <= 1 && R.runs[0].steps.every(s => !s._p)) { R.runs[0].steps = []; ri = 0; } else { let n = R.runs.length + 1; while (R.runs.some(r => r.id === 'R' + n)) n++; R.runs.push({ id: 'R' + n, steps: [] }); ri = R.runs.length - 1; } }
+      const r = R.runs[ri];
+      r._p0 = teeHit ? teeHit._p.slice() : p; r.start = teeHit ? { tee: teeHit.id } : (R.runs.some((x, i) => i !== ri && (x.start === 'origin' || !x.start) && x._p0) ? 'origin' : 'origin');
+      if (teeHit) delete r.dir;
+      T.cur = ri; T.tool = 'elbow';
+      msg(teeHit ? '티 ' + teeHit.id + ' 에서 분기를 시작합니다. 이어서 다음 점을 클릭하세요.' : '시작점을 찍었습니다. 이어서 꺾이는 점·플랜지·밸브 등을 차례로 클릭하세요.');
+      persist(); render(T.lastErrs); return;
+    }
+    const r = R.runs[T.cur];
+    if (!r || !r._p0) { msg('먼저 "① 시작점"을 찍으세요.'); return; }
+    const last = lastPt(r), v = [p[0] - last[0], p[1] - last[1]];
+    if (Math.hypot(v[0], v[1]) < 2 * unit()) { msg('앞 점과 너무 가깝습니다.'); return; }
+    const dir = nearestDir(v), a = SCR[dir], L = v[0] * a[0] + v[1] * a[1];
+    if (p === p0 || pdist(p, p0) > 0.01) {} // snapped point kept
+    const onAxis = [last[0] + a[0] * L, last[1] + a[1] * L];
+    if (pdist(onAxis, p) > 4 * unit()) p = onAxis; // 축에서 벗어난 클릭은 축 위로
+    let cur = runDirAt(r);
+    const lastStep = r.steps[r.steps.length - 1];
+    if (lastStep && lastStep.t === 'elbow' && !lastStep.to) {
+      if (Math.abs(SCR[cur] ? (SCR[cur][0] * a[0] + SCR[cur][1] * a[1]) : 0) > 0.9) { msg('엘보 다음은 방향이 꺾여야 합니다. 다른 방향의 점을 클릭하세요.'); return; }
+      lastStep.to = dir; cur = dir;
+    }
+    if (!r.steps.length && !cur) {
+      r.dir = dir; cur = dir;
+      if (r.start && r.start.tee) { const ts = R.runs.flatMap(x => x.steps).find(s => s.id === r.start.tee); if (ts && ts.t === 'tee' && !ts.branch) ts.branch = dir; }
+    } else if (!r.steps.length && r.dir !== dir && !(r.start && r.start.tee)) { r.dir = dir; cur = dir; }
+    if (cur && dir !== cur) { msg('진행 방향(' + DIRL[cur] + ')과 다른 방향입니다. 방향이 바뀌는 곳은 "꺾임" 도구로 먼저 찍으세요.'); return; }
+    const est = Math.max(10, Math.round(Math.abs(L) * 50 / unit() / 10) * 10);
+    const nps = +r.nps || +R.nps || 4;
+    const st = { t: tool, d: est, conf: 'low', est: true, _p: p };
+    if (tool === 'valve') Object.assign(st, { vt: T.vt || 'gate', conn: 'flg' });
+    if (tool === 'tee') { let n = 1; const ids = R.runs.flatMap(x => x.steps.map(s => s.id)).filter(Boolean); while (ids.includes('T' + n)) n++; Object.assign(st, { id: 'T' + n, branch: '', nps2: nps }); }
+    if (tool === 'reducer') { const i = SIZES.indexOf(nps); Object.assign(st, { nps2: SIZES[Math.max(0, i - 1)], rt: 'conc' }); }
+    if (tool === 'end') st.end = 'open';
+    if (tool === 'inst') Object.assign(st, { kind: 'FT', tag: 'FT-?' });
+    if (tool === 'equip') Object.assign(st, { kind: 'pump', tag: 'P-?', nozzle: 'SUC' });
+    r.steps.push(st);
+    if (tool === 'end' || tool === 'inst' || tool === 'equip') T.tool = 'start';
+    T.pending = st;
+    persist(); render(T.lastErrs);
+    // 치수 입력칸
+    const ov = $('tbov'), box = $('tbin'), inp = $('tbinv');
+    if (ov && box) { const k = ov.getBoundingClientRect().width / ((T.pageW || ov.width)); box.style.left = (p[0] * k + 8) + 'px'; box.style.top = (p[1] * k - 14) + 'px'; box.hidden = false; inp.value = est; inp.select(); inp.focus(); }
+    msg(STEP[tool] + ' 추가: 도면 치수를 입력하고 Enter (어림값 ' + est + 'mm). Esc는 어림값 유지.');
+  }
+  function drawOv() {
+    const ov = $('tbov'); if (!ov || !ov.width) return;
+    const g = ov.getContext('2d'), k = ov.width / (T.pageW || ov.width);
+    g.clearRect(0, 0, ov.width, ov.height);
+    const X = p => [p[0] * k, p[1] * k];
+    if (T.ext) { g.strokeStyle = 'rgba(37,99,235,.35)'; g.lineWidth = Math.max(3, 5 * k / 2); T.ext.pipes.forEach(l => { const a = X(l.a), b = X(l.b); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }); }
+    T.R.runs.forEach((r, ri) => {
+      if (!r._p0) return;
+      const on = ri === T.cur, col = r.existing ? '#64748b' : on ? '#dc2626' : '#ea580c';
+      let a = X(r._p0);
+      g.fillStyle = col; g.beginPath(); g.arc(a[0], a[1], 7, 0, 7); g.fill();
+      g.font = 'bold 18px sans-serif'; g.fillText(r.id || '', a[0] + 9, a[1] - 9);
+      r.steps.forEach((s, i) => {
+        if (!s._p) return; const b = X(s._p);
+        g.strokeStyle = col; g.lineWidth = on ? 4 : 3; g.setLineDash(r.existing ? [10, 6] : []); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.setLineDash([]);
+        g.fillStyle = s.conf === 'low' ? '#ca8a04' : col; g.strokeStyle = '#fff'; g.lineWidth = 2;
+        g.beginPath(); if (s.t === 'flange') g.rect(b[0] - 6, b[1] - 6, 12, 12); else g.arc(b[0], b[1], s.t === 'elbow' ? 6 : 8, 0, 7); g.fill(); g.stroke();
+        g.fillStyle = '#111'; g.font = '15px sans-serif'; g.fillText((i + 1) + ({ elbow: '', flange: 'F', valve: 'V', tee: 'T', tee_in: 'T', reducer: 'R', inst: 'I', equip: 'E', end: '■' }[s.t] || ''), b[0] + 9, b[1] + 16);
+        a = b;
+      });
+    });
+  }
+  async function autoExtract() {
+    if (!T.f || T.f.type !== 'application/pdf') return;
+    if (!window.P3DVEC) { msg('자동 추출 모듈을 불러오지 못했습니다.'); return; }
+    msg('도면의 선을 분석하는 중…');
+    try {
+      const L = await P.pdfLib(), res = await window.P3DVEC.extract(L, new Uint8Array(await T.f.blob.arrayBuffer()));
+      T.ext = res; T.pageW = res.page.W;
+      if (!res.route || !res.route.runs.length) { msg('배관 선을 찾지 못했습니다. 이 도면은 클릭으로 따라 그려 주세요. (스캔본·이미지는 자동 추출이 안 됩니다)'); drawOv(); return; }
+      const hasWork = T.R.runs.some(r => r.steps.some(s => s._p) || r.steps.length > 1);
+      if (hasWork && !confirm('지금 표 내용을 자동 추출 결과로 바꿀까요?')) { drawOv(); return; }
+      const keep = { line_no: T.R.line_no, title: T.R.title, nps: T.R.nps, cls: T.R.cls };
+      T.R = Object.assign(res.route, Object.fromEntries(Object.entries(keep).filter(([, v]) => v)));
+      T.cur = 0; T.tool = null;
+      persist(); render();
+      const n = T.R.runs.reduce((a, r) => a + r.steps.length, 0);
+      msg('자동 추출: 구간 ' + T.R.runs.length + '개, 항목 ' + n + '개. 거리는 어림값(노란 줄)이니 도면 치수로 고치고, 빠진 티·레듀서·장치를 추가한 뒤 "3D에 반영"을 누르세요.');
+    } catch (e) { msg('자동 추출 실패: ' + e.message); }
+  }
 
   async function persist() { if (T.f) { T.f.route = T.R; await P.fPut(T.f); } }
   function setPath(obj, k, v) {
@@ -467,6 +616,8 @@ RULES
     persist();
   }
   function onClick(e) {
+    const tb = e.target.closest('[data-tool]');
+    if (tb && T) { T.tool = T.tool === tb.dataset.tool ? null : tb.dataset.tool; document.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('on', x.dataset.tool === T.tool)); hint(); return; }
     const b = e.target.closest('[data-tr]');
     if (!b || !T) return;
     const a = b.dataset.tr, R = T.R, ri = +b.dataset.ri, si = +b.dataset.si;
@@ -479,6 +630,8 @@ RULES
     else if (a === 'rdel') { if (!confirm('이 구간을 삭제할까요?')) return; R.runs.splice(ri, 1); }
     else if (a === 'radd') { let n = R.runs.length + 1; while (R.runs.some(r => r.id === 'R' + n)) n++; R.runs.push({ id: 'R' + n, start: 'origin', dir: '+X', steps: [{ t: 'end', d: 1000, end: 'open' }] }); }
     else if (a === 'zoom') { zoomBig = !zoomBig; drawRef(); return; }
+    else if (a === 'auto') { autoExtract(); return; }
+    else if (a === 'undo') { const r = R.runs[T.cur] || R.runs[R.runs.length - 1]; if (!r) return; if (r.steps.length) r.steps.pop(); else if (r._p0) { delete r._p0; if (R.runs.length > 1) R.runs.splice(R.runs.indexOf(r), 1); T.cur = Math.max(0, R.runs.length - 1); } $('tbin') && ($('tbin').hidden = true); }
     else if (a === 'build') { apply(); return; }
     else if (a === 'iso' || a === 'show') { const ids = P.getObjs().filter(o => o.src === T.src && !o.ex).map(o => o.id); if (!ids.length) { msg('먼저 "3D에 반영"을 눌러 주세요.'); return; } if (a === 'iso') { P.showIso(ids[0]); backBtn(); } else P.focus(P.getObjs().filter(o => o.src === T.src).map(o => o.id)); return; }
     else return;
@@ -493,7 +646,7 @@ RULES
     bar.insertBefore(b, bar.firstChild);
     const cl = $('isoc'); if (cl) cl.addEventListener('click', () => b.remove(), { once: true });
   }
-  function msg(t) { const el = $('tbmsg'); if (el) el.textContent = t; }
+  function msg(t) { if (T) T.lastMsg = t; const el = $('tbmsg'); if (el) el.textContent = t; }
   function apply() {
     const R = T.R;
     const b = buildRoute(R, T.src);
@@ -507,25 +660,26 @@ RULES
   async function table(fid) {
     const f = (await P.fAll()).find(x => x.id === fid);
     if (!f) return;
-    if (!f.route) f.route = blank();
-    T = { fid, f, R: f.route, src: 'iso:' + fid, lastErrs: null };
+    if (!f.route) f.route = { line_no: '', title: '', nps: 4, cls: 150, notes: [], runs: [{ id: 'R1', start: 'origin', dir: '', nps: 4, existing: false, steps: [] }] };
+    T = { fid, f, R: f.route, src: 'iso:' + fid, lastErrs: null, cur: 0, tool: null, vt: 'gate', shown: null };
     render();
+    if (f.type === 'application/pdf' && window.P3DVEC) { try { const L = await P.pdfLib(); const res = await window.P3DVEC.extract(L, new Uint8Array(await f.blob.arrayBuffer())); if (T && T.fid === fid) { T.ext = res; T.pageW = res.page.W; drawOv(); } } catch (e) {} }
   }
   function manual() {
-    T = { fid: null, f: null, R: blank(), src: 'manual:' + Date.now(), lastErrs: null };
+    T = { fid: null, f: null, R: blank(), src: 'manual:' + Date.now(), lastErrs: null, cur: 0, tool: null, shown: null };
     render();
   }
 
   document.getElementById('isob').addEventListener('change', onChange);
   document.getElementById('isob').addEventListener('click', onClick);
   const css = document.createElement('style');
-  css.textContent = `.tbw{display:grid;grid-template-columns:minmax(300px,42%) 1fr;gap:12px;align-items:start}
-.tbimg{position:sticky;top:0}.tbcv{overflow:auto;max-height:78vh;border:1px solid #cbd5e1;background:#fff}.tbcv canvas{display:block}
+  css.textContent = `.tbw{display:grid;grid-template-columns:minmax(360px,52%) 1fr;gap:12px;align-items:start}
+.tbimg{position:sticky;top:0}.tbcv{overflow:auto;max-height:76vh;border:1px solid #cbd5e1;background:#fff}.cvw{position:relative;width:100%}.cvw canvas{display:block;width:100%}#tbov{position:absolute;left:0;top:0;height:100%;cursor:crosshair}#tbin{position:absolute;background:#fff;border:2px solid #dc2626;border-radius:6px;padding:3px 5px;box-shadow:0 4px 12px rgba(0,0,0,.2);white-space:nowrap}#tbin input{width:90px;font-size:15px}.tbtools{flex-wrap:wrap;gap:4px}.tbtools button,.tbtools select{padding:4px 8px;font-size:12px;white-space:nowrap;width:auto}.tbtools button.on{background:#dc2626;color:#fff;border-color:#dc2626}#tbhint{margin:2px 0 6px;font-size:12px}
 .tbr{min-width:0}.run{border:1px solid #cbd5e1;border-radius:8px;padding:8px;margin:10px 0;background:#fff}.run.exr{background:#f1f5f9;border-style:dashed}
 .tbt{width:100%;border-collapse:collapse;font-size:12px}.tbt th,.tbt td{border-bottom:1px solid #e2e8f0;padding:3px 4px;text-align:left;vertical-align:middle}
 .tbt tr.low td{background:#fef9c3}.tbt tr.err td{background:#fee2e2}.errm{background:#fee2e2;padding:4px 6px;border-radius:4px;margin:4px 0}
 .tbt select,.tbt input{font-size:12px}.tbt td.nw{white-space:nowrap}.tbt td.nw button{padding:1px 6px}
-.tbh label,.run label{font-size:12px;margin-right:6px}.notes{background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 10px;margin:6px 0;font-size:13px}.notes ul{margin:4px 0 0 18px;padding:0}
+.tbh label,.run label{font-size:12px;margin-right:6px;white-space:nowrap}.run .row,.tbh{flex-wrap:wrap;gap:4px}.run .row button{white-space:nowrap;width:auto}.notes{background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:6px 10px;margin:6px 0;font-size:13px}.notes ul{margin:4px 0 0 18px;padding:0}
 @media(max-width:900px){.tbw{grid-template-columns:1fr}.tbimg{position:static}}`;
   document.head.appendChild(css);
 
