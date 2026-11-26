@@ -1,0 +1,16 @@
+{
+  "name": "PLANT 3D 편집기",
+  "short_name": "PLANT 3D",
+  "description": "플랜트 배관·장치 3D 편집, ISO 도면, 가스켓·BOM 관리",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
