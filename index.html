@@ -165,12 +165,14 @@ function iso(mode){lastIso=mode;
  const mkcp=x=>{const pts=cpts(x),ex=[];if(x.type==='tee'){const pq=ports(x),a=pts[0],b=pts[1];ex.push([[(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2],pq[1].p])}return{x,pts,ex}},cp=set.map(mkcp);
  const EXS=[];{const seen=new Set(set);let fr=set.filter(x=>!x.ex),dep=0;while(fr.length&&dep<60){const nx=[];fr.forEach(c=>conO(c).forEach(x=>{if(!seen.has(x)&&x.ex&&LIN.includes(x.type)){seen.add(x);EXS.push(x);nx.push(x)}}));fr=nx;dep++}}
  const ecp=EXS.map(mkcp);
+ const EQC=[];{const seen={};joints().forEach(j=>{[[j.a,j.na,j.b],[j.b,j.nb,j.a]].forEach(([o,n,other])=>{if(EQ.includes(o.type)&&set.includes(other)){const k=o.id+'|'+n;if(seen[k])return;seen[k]=1;const pt=ports(o).find(q=>q.n===n);if(pt)EQC.push({o,n,p:pt.p,d:pt.d})}})})}
+ const eqRes=c=>[c.p[0]-c.d.x*1500,c.p[1]-c.d.y*1500,c.p[2]-c.d.z*1500];
  /* 축척 없음(NTS): 축별 좌표를 압축해 짧은 구간도 보이게 (긴 구간은 √ 압축) */
- const KN=[[],[],[]];const kn=p=>{for(let i=0;i<3;i++)KN[i].push(p[i])};cp.concat(ecp).forEach(c=>{c.pts.forEach(kn);c.ex.forEach(l=>l.forEach(kn))});set.concat(EXS).forEach(x=>ports(x).forEach(m=>kn(m.p)));
+ const KN=[[],[],[]];const kn=p=>{for(let i=0;i<3;i++)KN[i].push(p[i])};cp.concat(ecp).forEach(c=>{c.pts.forEach(kn);c.ex.forEach(l=>l.forEach(kn))});set.concat(EXS).forEach(x=>ports(x).forEach(m=>kn(m.p)));EQC.forEach(c=>{kn(c.p);kn(eqRes(c))});
  const gS=d=>d<300?d*Math.sqrt(300)/300:Math.sqrt(300)*Math.pow(d/300,.25),AX=KN.map(a=>{const v=[...new Set(a.map(t=>Math.round(t*10)/10))].sort((p,q)=>p-q),m=[0];for(let i=1;i<v.length;i++)m.push(m[i-1]+gS(v[i]-v[i-1]));return{v,m}});
  const mp1=(A,t)=>{const v=A.v,m=A.m,n=v.length;if(n<2)return t*.058;if(t<=v[0])return m[0]-(v[0]-t)*.058;if(t>=v[n-1])return m[n-1]+(t-v[n-1])*.058;let lo=0,hi=n-1;while(hi-lo>1){const md=(lo+hi)>>1;if(v[md]<=t)lo=md;else hi=md}return m[lo]+(m[hi]-m[lo])*(t-v[lo])/((v[hi]-v[lo])||1)};
  const M3=p=>[mp1(AX[0],p[0]),mp1(AX[1],p[1]),mp1(AX[2],p[2])],pjm=p=>pj(M3(p));
- const all=[];cp.concat(ecp).forEach(c=>{c.pts.forEach(p=>all.push(pjm(p)));c.ex.forEach(l=>l.forEach(p=>all.push(pjm(p))))});
+ const all=[];cp.concat(ecp).forEach(c=>{c.pts.forEach(p=>all.push(pjm(p)));c.ex.forEach(l=>l.forEach(p=>all.push(pjm(p))))});EQC.forEach(c=>{all.push(pjm(c.p));all.push(pjm(eqRes(c)))});
  const xs=all.map(p=>p[0]),ys=all.map(p=>p[1]),mnx=Math.min(...xs),mxx=Math.max(...xs),mny=Math.min(...ys),mxy=Math.max(...ys);
  const AW=660,AH=450,k=Math.min(6,AW/Math.max(mxx-mnx,1),AH/Math.max(mxy-mny,1)),tf=p=>{const q=pjm(p);return[60+(q[0]-mnx)*k+(AW-(mxx-mnx)*k)/2,100+(q[1]-mny)*k+(AH-(mxy-mny)*k)/2]};
  const f1=v=>(+v).toFixed(1),E=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -223,7 +225,7 @@ function iso(mode){lastIso=mode;
  {const R1=v=>Math.round(v),ax3=(a,b)=>{const d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],m=d.map(Math.abs);return m[0]>=m[1]&&m[0]>=m[2]?0:m[1]>=m[2]?1:2};
   const G={};cp.forEach(({x,pts})=>{if(x.type==='tee'||(x.type==='reducer'&&rtk(x)!=='conc'))return;for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],ai=ax3(a,b);if(Math.hypot(b[0]-a[0],b[1]-a[1],b[2]-a[2])<.5)continue;const o=[0,1,2].filter(k=>k!==ai),key=ai+'|'+o.map(k=>R1(a[k])).join('|');(G[key]=G[key]||{ai,o,c:o.map(k=>a[k]),iv:[]}).iv.push([Math.min(a[ai],b[ai]),Math.max(a[ai],b[ai])])}});
   const addIv=(a,b)=>{const ai=ax3(a,b),o=[0,1,2].filter(k=>k!==ai),key=ai+'|'+o.map(k=>R1(a[k])).join('|');(G[key]=G[key]||{ai,o,c:o.map(k=>a[k]),iv:[]}).iv.push([Math.min(a[ai],b[ai]),Math.max(a[ai],b[ai])])};set.filter(x=>x.type==='tee').forEach(x=>{const pp=ports(x),c=pp[0].p.map((v,i)=>(v+pp[2].p[i])/2);addIv(pp[2].p,pp[0].p);addIv(c,pp[1].p)});
-  const ND=[],TN=[],TX=[];set.forEach(x=>{if(x.type==='elbow'){const q=cpts(x);if(q.length===3)ND.push(q[1])}if(x.type==='tee'){const pp=ports(x),tc=pp[0].p.map((v,i)=>(v+pp[2].p[i])/2);ND.push(tc);TN.push(tc)}ports(x).forEach(m=>{const po=objs.find(y=>y!==x&&ports(y).some(q=>Math.hypot(m.p[0]-q.p[0],m.p[1]-q.p[1],m.p[2]-q.p[2])<3&&m.d.dot(q.d)<-.9));if((!po||!!po.ex!==!!x.ex)&&['pipe','flange','elbow'].includes(x.type))ND.push(m.p)})});js.forEach(j=>ND.push(j.p));set.forEach(x=>{if(x.type==='cap')ND.push(ports(x)[0].p);if(x.type==='reducer'&&rtk(x)==='conc'){const pp=ports(x),c=pp[0].p.map((v,i)=>(v+pp[1].p[i])/2);if(!ND.some(q=>Math.hypot(q[0]-c[0],q[1]-c[1],q[2]-c[2])<300))ND.push(c)}});
+  const ND=[],TN=[],TX=[];set.forEach(x=>{if(x.type==='elbow'){const q=cpts(x);if(q.length===3)ND.push(q[1])}if(x.type==='tee'){const pp=ports(x),tc=pp[0].p.map((v,i)=>(v+pp[2].p[i])/2);ND.push(tc);TN.push(tc)}ports(x).forEach(m=>{const po=objs.find(y=>y!==x&&ports(y).some(q=>Math.hypot(m.p[0]-q.p[0],m.p[1]-q.p[1],m.p[2]-q.p[2])<3&&m.d.dot(q.d)<-.9));if((!po||!!po.ex!==!!x.ex)&&['pipe','flange','elbow'].includes(x.type))ND.push(m.p)})});js.forEach(j=>ND.push(j.p));set.forEach(x=>{if(x.type==='cap')ND.push(ports(x)[0].p);if(x.type==='reducer'&&rtk(x)==='conc'){const pp=ports(x),c=pp[0].p.map((v,i)=>(v+pp[1].p[i])/2);if(!ND.some(q=>Math.hypot(q[0]-c[0],q[1]-c[1],q[2]-c[2])<300))ND.push(c)}else if(x.type==='reducer'){const pp=ports(x);ND.push(pp[0].p,pp[1].p)}});
   const dseg=(q,a,b)=>{const d=[b[0]-a[0],b[1]-a[1]],l2=d[0]*d[0]+d[1]*d[1]||1,t=Math.max(0,Math.min(1,((q[0]-a[0])*d[0]+(q[1]-a[1])*d[1])/l2));return Math.hypot(q[0]-a[0]-d[0]*t,q[1]-a[1]-d[1]*t)},PS=[];cp.forEach(({pts,ex})=>{for(let i=0;i<pts.length-1;i++)PS.push([tf(pts[i]),tf(pts[i+1])]);ex.forEach(l=>PS.push([tf(l[0]),tf(l[1])]))});
   const cen=all.reduce((a,q)=>[a[0]+q[0]/all.length,a[1]+q[1]/all.length],[0,0]),used=[];
   Object.values(G).forEach(g=>{g.iv.sort((p,q)=>p[0]-q[0]);const runs=[];g.iv.forEach(v=>{const L=runs[runs.length-1];if(L&&v[0]<=L[1]+6)L[1]=Math.max(L[1],v[1]);else runs.push(v.slice())});
@@ -242,7 +244,19 @@ function iso(mode){lastIso=mode;
  /* 라인 번호: 가장 긴 배관 1곳 */
  {let bp=null,bl=0;cp.forEach(({x,pts})=>{if(x.type!=='pipe')return;const a=tf(pts[0]),b=tf(pts[pts.length-1]),h=Math.hypot(b[0]-a[0],b[1]-a[1])*(Math.abs(b[0]-a[0])<2?.6:1);if(h>bl){bl=h;bp=[a,b]}});if(bp&&ln&&bl>40){const[a,b]=bp,hl0=Math.hypot(b[0]-a[0],b[1]-a[1]),u=[(b[0]-a[0])/hl0,(b[1]-a[1])/hl0],n=[-u[1],u[0]],up=n[1]<0?n:[-n[0],-n[1]];let rr=Math.atan2(u[1],u[0])*180/Math.PI;if(rr>90)rr-=180;if(rr<-90)rr+=180;s+=tx((a[0]+b[0])/2+up[0]*9,(a[1]+b[1])/2+up[1]*9,ln,10,'#111',rr)}}
  const fsym=(c,u,w)=>{const L=11,t2=2.3,g=1.2,mk=o=>pg(P2(c,u,w,o,-L),P2(c,u,w,o,L),P2(c,u,w,o+t2,L),P2(c,u,w,o+t2,-L)),ang=Math.atan2(w[1],w[0])*180/Math.PI;return mk(-g/2-t2)+mk(g/2)+`<ellipse cx='${f1(c[0])}' cy='${f1(c[1])}' rx='6' ry='3.4' fill='none' stroke='#111' stroke-width='.9' transform='rotate(${f1(ang)} ${f1(c[0])} ${f1(c[1])})'/>`};
- js.forEach(j=>{const q=tf(j.p);s+=fsym(q,scr(j.d),wAxis(j.d));const eq=[[j.a,j.na],[j.b,j.nb]].find(([ob])=>EQ.includes(ob.type));if(eq)s+=callout(q,eq[0].tag+' '+eq[1],[-.8,-.45])});
+ js.forEach(j=>{const q=tf(j.p);s+=fsym(q,scr(j.d),wAxis(j.d))});
+ /* 연결된 장치 윤곽 (태그·노즐) */
+ {const done={};EQC.forEach(c=>{const o=c.o,q=tf(c.p),os=scr(c.d),th=(o.rot||0)*Math.PI/180,lx=scr(V(Math.cos(th),0,-Math.sin(th))),up=c.d.y>.9,dn=c.d.y<-.9;
+  const pgf=(...ps)=>`<polygon points='${ps.map(p=>p.map(f1).join(',')).join(' ')}' fill='#fff' stroke='#111' stroke-width='.9'/>`,TG=(x,y,t)=>`<text x='${f1(x)}' y='${f1(y)}' font-size='9' font-weight='bold' text-anchor='middle' fill='#111'>${E(t)}</text>`;
+  s+=tx(q[0]+(up||dn?14:-os[1]*12)+os[0]*4,q[1]+(up?10:dn?-6:os[0]*12)+os[1]*4,c.n,8,'#111');
+  if(done[o.id])return;done[o.id]=1;let g='';
+  if(o.type==='vessel'||o.type==='reactor'){const W=17,H=o.type==='reactor'?96:82;const cx=up?q[0]:dn?q[0]:q[0]-os[0]*(W+10),cy=up?q[1]+H/2+10:dn?q[1]-H/2-10:q[1]-os[1]*(W+10)+H*.15;
+   g=`<rect x='${f1(cx-W)}' y='${f1(cy-H/2)}' width='${2*W}' height='${H}' rx='${W}' ry='9' fill='#fff' stroke='#111' stroke-width='.9'/>`+ln2([cx-W*.9,cy+H/2-4],[cx-W*1.1,cy+H/2+10],.8)+ln2([cx+W*.9,cy+H/2-4],[cx+W*1.1,cy+H/2+10],.8)+TG(cx,cy+3,o.tag)}
+  else if(o.type==='drum'||o.type==='hx'){const ax=lx,L=52,W=15,head=Math.abs(c.d.y)<.1&&Math.abs(os[0]*ax[0]+os[1]*ax[1])>.9;const cc=head?[q[0]-os[0]*(L+12),q[1]-os[1]*(L+12)]:up?[q[0],q[1]+W+10]:dn?[q[0],q[1]-W-10]:[q[0]-os[0]*(W+10),q[1]-os[1]*(W+10)];
+   const P_=(a,b)=>[cc[0]+ax[0]*a,cc[1]+ax[1]*a+b];g=pgf(P_(-L,-W),P_(L,-W),P_(L,W),P_(-L,W))+`<ellipse cx='${f1(P_(L,0)[0])}' cy='${f1(P_(L,0)[1])}' rx='7' ry='${W}' fill='#fff' stroke='#111' stroke-width='.9'/><ellipse cx='${f1(P_(-L,0)[0])}' cy='${f1(P_(-L,0)[1])}' rx='7' ry='${W}' fill='#fff' stroke='#111' stroke-width='.9'/>`+ln2(P_(-L*.6,W),P_(-L*.6,W+9),.8)+ln2(P_(L*.6,W),P_(L*.6,W+9),.8)+TG(cc[0],cc[1]+3,o.tag)}
+  else if(o.type==='pump'){const suc=c.n==='SUC';const cs=suc?[q[0]-os[0]*20,q[1]-os[1]*20+4]:[q[0]-lx[0]*6,q[1]+20];const mx=[-lx[0],-lx[1]],P_=(a,b)=>[cs[0]+mx[0]*a,cs[1]+mx[1]*a+b];
+   g=pgf(P_(14,-9),P_(54,-9),P_(54,9),P_(14,9))+`<circle cx='${f1(cs[0])}' cy='${f1(cs[1])}' r='13' fill='#fff' stroke='#111' stroke-width='.9'/>`+ln2(P_(-16,16),P_(58,16),1.2)+TG(cs[0]+mx[0]*30,cs[1]+mx[1]*30+30,o.tag)}
+  s+=g})}
  set.forEach(x=>{if(x.type==='flange'){const cn=conns(x),pp=ports(x);if(!cn[0]){const q=tf(pp[0].p),dd=DIR[x.axis];s+=fsym(q,scr(dd),wAxis(dd))}}});
  /* 북쪽 표시 (모델 -Z 방향) */
  const nd=[.866,-.5],nc=[730,110],ntip=[nc[0]+nd[0]*26,nc[1]+nd[1]*26],nn=[-nd[1],nd[0]];

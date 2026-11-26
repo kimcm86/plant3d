@@ -17,8 +17,9 @@
   const DIRL = { '+X': '+X (오른쪽 아래)', '-X': '-X (왼쪽 위)', '+Y': '+Y (위)', '-Y': '-Y (아래)', '+Z': '+Z (왼쪽 아래)', '-Z': '-Z (오른쪽 위·북)' };
   const STEP = {
     elbow: '엘보 (꺾임)', flange: '플랜지 조인트', valve: '밸브', tee: '티 (분기)', tee_in: '티 (분기로 들어옴)',
-    reducer: '레듀서', inst: '계기', end: '끝'
+    reducer: '레듀서', inst: '계기', equip: '장치 연결 (끝)', end: '끝'
   };
+  const EQK = [['pump', '펌프'], ['vessel', '수직 베셀'], ['reactor', '반응기'], ['drum', '횡형 드럼'], ['hx', '열교환기']];
   const ENDS = [['open', '열린 끝/용접'], ['cap', '캡'], ['blind', '블라인드 플랜지'], ['flange', '플랜지 면']];
   const SIZES = P.SZ.map(s => s[0]);
   const E = P.EH;
@@ -63,6 +64,8 @@ start:
  {"tee":"T1"} — starts at the free side of tee T1 (its branch; for tee_in the other run side). The first d is measured from the tee CENTER.
  {"start_of":"R1"} — starts where run R1 starts, going the other way (e.g. existing pipe continuing below a tie-in point)
  {"end_of":"R1"} — starts where run R1 ends
+ {"equip":{"kind":"vessel","tag":"V-101","nozzle":"N1"}} — only for the first run, when the line starts at an equipment nozzle; dir = direction leaving the nozzle
+ {"nozzle":{"tag":"P-101A","n":"DIS"}} — starts at a nozzle of equipment already placed by an earlier run (e.g. pump discharge after the suction run ended at the pump)
 Steps:
  {"t":"elbow","d":1200,"to":"-X"}  90° elbow, corner at d, new direction "to" (perpendicular)
  {"t":"flange","d":4000}  flange joint (2 flanges + gasket) centered at d
@@ -71,6 +74,7 @@ Steps:
  {"t":"tee_in","d":1500,"id":"T2","run":"-Z","nps_run":6}  we arrive through the tee's branch and continue along "run"; the opposite run side can start another run with {"tee":"T2"}
  {"t":"reducer","d":300,"nps2":3,"rt":"conc"}  reducer centered at d (rt conc|ecc); size becomes nps2
  {"t":"inst","d":150,"kind":"FT","tag":"FT-1001"}  instrument at d (ends the run)
+ {"t":"equip","d":1500,"kind":"pump","tag":"P-101A","nozzle":"SUC","nps2":3}  the run ends at an equipment nozzle flange (d = to the nozzle flange face). kind: pump|vessel|reactor|drum|hx. Pump nozzles: SUC (suction, horizontal) and DIS (discharge, vertical up); nps2 = the pump's other nozzle size. Vessels/drums/exchangers: use the nozzle name drawn (N1, N2 ...). Equipment is often drawn as an outline or only named at the line end (e.g. "TO P-101A SUCTION", "FROM V-101 N3") — use that.
  {"t":"end","d":1000,"end":"open"}  end of run at d. end: open (weld/continuation) | cap | blind (flange + blind flange) | flange (open flange face)
 Optional on any step: "conf":"low" when estimated, "note":"Korean text".
 Sizes are NPS in inches as numbers: 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12 ...
@@ -80,6 +84,7 @@ RULES
 - Keep the geometry consistent: closed loops must close with the given dimensions.
 - Do not invent parts that are not drawn; do not drop drawn parts.
 - Existing (dashed) piping: include only what is drawn, existing:true, estimated distances with "conf":"low".
+- If a line connects to a pump, vessel, drum, exchanger or reactor, end the run with an "equip" step (or start with "equip"/"nozzle") so the equipment is placed in 3D.
 - Answer: first a short Korean summary (3–5 lines), then exactly ONE \`\`\`json block containing the object. Nothing after it.`;
 
   /* ---------------- 경로표 → 3D 부품 ---------------- */
@@ -101,7 +106,43 @@ RULES
       out.push(o);
       return o;
     };
-    const tees = {}, runs = {};
+    const tees = {}, runs = {}, equips = {};
+    const EQT = ['pump', 'vessel', 'reactor', 'drum', 'hx'];
+    function placeEquip(q, J, out, npsHere, ri, si) {
+      const kind = EQT.includes(q.kind) ? q.kind : 'vessel', tag = q.tag || (P.T[kind].p + '-?');
+      const ovv = P.DIR[out], ang = Math.round(Math.atan2(-ovv.z, ovv.x) * 180 / Math.PI);
+      let o = equips[tag], name;
+      if (o) {
+        name = q.nozzle || 'N' + ((o.nz || []).length + 1);
+        const pt = P.ports(o).find(x => x.n === name);
+        if (!pt || Math.hypot(pt.p[0] - J[0], pt.p[1] - J[1], pt.p[2] - J[2]) > 5) errs.push({ ri, si, msg: tag + ' 는 이미 배치됨: 두 번째 배관은 시작을 "장치 노즐에서"로 하세요' });
+        return o;
+      }
+      const sv = base; base = { ln: '' };
+      o = mk(kind, { pos: [0, 0, 0], tag });
+      base = sv;
+      if (kind === 'pump') {
+        const dis = /^d/i.test(q.nozzle || '');
+        name = dis ? 'DIS' : 'SUC';
+        if (dis) { if (out !== '+Y') errs.push({ ri, si, msg: '펌프 토출(DIS)은 위(+Y)로만 연결할 수 있습니다' }); o.nps2 = npsHere; o.nps = +q.nps2 || npsHere; o.rot = +q.rot || 0; }
+        else { if (Math.abs(ovv.y) > .5) errs.push({ ri, si, msg: '펌프 흡입(SUC)은 수평 방향이어야 합니다' }); o.nps = npsHere; o.nps2 = +q.nps2 || (P.SZ[Math.max(0, P.SZ.findIndex(z => z[0] == npsHere) - 1)] || [npsHere])[0]; o.rot = ang; }
+      } else if (kind === 'vessel' || kind === 'reactor') {
+        name = q.nozzle || 'N1';
+        const z = { n: name, nps: npsHere, cls: +R.cls || 150, len: 250 };
+        if (out === '+Y') z.k = 'A'; else if (out === '-Y') z.k = 'B'; else { z.k = 'radial'; z.a = Math.round(Math.atan2(ovv.z, ovv.x) * 180 / Math.PI); z.p = Math.round(o.h * 0.5); }
+        o.nz = [z];
+      } else {
+        name = q.nozzle || 'N1';
+        const z = { n: name, nps: npsHere, cls: +R.cls || 150, len: 250 };
+        if (Math.abs(ovv.y) > .5) { z.k = 'radial'; z.a = ovv.y > 0 ? 0 : 180; z.p = 0; o.rot = 0; } else { z.k = 'A'; o.rot = ang; }
+        o.nz = [z];
+      }
+      const pt = P.ports(o).find(x => x.n === name);
+      o.pos = R1([J[0] - pt.p[0], J[1] - pt.p[1], J[2] - pt.p[2]]);
+      if (q.note) o.note = q.note;
+      equips[tag] = o;
+      return o;
+    }
     const runsIn = (R.runs || []).filter(r => r && Array.isArray(r.steps));
 
     function doRun(r, ri) {
@@ -111,11 +152,18 @@ RULES
       else if (s.tee) { const t = tees[s.tee]; if (!t) return false; P0 = t.free; cen = t.center; dir = dir || t.freeDir; if (!r.nps) nps = t.freeNps; }
       else if (s.start_of) { const q = runs[s.start_of]; if (!q) return false; P0 = q.start; cen = P0; }
       else if (s.end_of) { const q = runs[s.end_of]; if (!q) return false; P0 = q.end; cen = P0; }
+      else if (s.equip) { P0 = s.equip.xyz || [0, 1000, 0]; cen = P0; }
+      else if (s.nozzle) { const o = equips[s.nozzle.tag]; if (!o) return false; const pt = P.ports(o).find(x => x.n === s.nozzle.n); if (!pt) { errs.push({ ri, si: -1, msg: s.nozzle.tag + ' 에 ' + s.nozzle.n + ' 노즐이 없음' }); return true; } P0 = pt.p.slice(); cen = P0; dir = P.keyOf(pt.d); if (!r.nps) nps = pt.nps; }
       else { errs.push({ ri, si: -1, msg: '시작 위치를 알 수 없음' }); return true; }
       if (!DIRS.includes(dir)) { errs.push({ ri, si: -1, msg: '시작 방향이 없음' }); return true; }
       base = { ln: r.line_no || LN };
       if (r.existing) base.ex = true;
       const st = { cen: P0.slice(), cur: P0.slice(), dir, nps };
+      if (s.equip || s.nozzle) {
+        if (s.equip) placeEquip(s.equip, P0, dir, nps, ri, -1);
+        const f = mk('flange', { pos: R1(add3(P0, dir, P.HGx(+R.cls || 150, 'RF', nps))), axis: dir, nps, kind: 'wn', face: 'RF' });
+        st.cur = add3(f.pos, dir, f.len);
+      }
       const pipeTo = (pt, si) => {
         const d = P.DIR[st.dir];
         const L = (pt[0] - st.cur[0]) * d.x + (pt[1] - st.cur[1]) * d.y + (pt[2] - st.cur[2]) * d.z;
@@ -191,11 +239,19 @@ RULES
             const n2 = +p.nps2 || st.nps;
             const rd = mk('reducer', { pos: [0, 0, 0], axis: d, nps: st.nps, nps2: n2, rt: p.rt === 'ecc' ? 'fob' : 'conc' });
             rd.pos = R1(add3(C, d, -rd.len / 2)); pipeTo(rd.pos, si);
-            st.cur = add3(rd.pos, d, rd.len); st.cen = C; st.nps = n2; break;
+            const ep = P.ports(rd)[0].p, ax = add3(rd.pos, d, rd.len), sh = [ep[0] - ax[0], ep[1] - ax[1], ep[2] - ax[2]];
+            st.cur = ep.slice(); st.cen = [C[0] + sh[0], C[1] + sh[1], C[2] + sh[2]]; st.nps = n2; break;
           }
           case 'inst': {
             pipeTo(C, si);
             mk('inst', { pos: C, axis: d, nps: st.nps, kind: p.kind || 'FT', tag: p.tag || ((p.kind || 'FT') + '-?') });
+            st.cur = C; st.cen = C; ended = true; break;
+          }
+          case 'equip': {
+            const h = P.HGx(+R.cls || 150, 'RF', st.nps);
+            const f1 = mk('flange', { pos: R1(add3(C, d, -h)), axis: neg(d), nps: st.nps, kind: 'wn', face: 'RF' });
+            pipeTo(add3(f1.pos, neg(d), f1.len), si);
+            placeEquip(p, C, neg(d), st.nps, ri, si);
             st.cur = C; st.cen = C; ended = true; break;
           }
           case 'end': {
@@ -213,7 +269,7 @@ RULES
           }
           default: errs.push({ ri, si, msg: '알 수 없는 종류: ' + p.t });
         }
-        if (p.note) out.slice(n0).filter(o => o.type !== 'pipe').forEach(o => { o.note = p.note; });
+        if (p.note) out.slice(n0).filter(o => o.type !== 'pipe' && !EQT.includes(o.type)).forEach(o => { o.note = p.note; });
       });
       if (!ended) errs.push({ ri, si: -1, msg: '끝(end) 항목이 없어 마지막 부품에서 끝남' });
       runs[r.id || ('R' + (ri + 1))] = { start: P0, end: st.cur };
@@ -336,8 +392,8 @@ RULES
   const blank = () => ({ line_no: '', title: '', nps: 4, cls: 150, notes: [], runs: [{ id: 'R1', start: 'origin', dir: '+Y', nps: 4, existing: false, steps: [{ t: 'end', d: 1000, end: 'open' }] }] });
   let T = null; // {fid, f, R}
   const opt = (arr, v) => arr.map(a => { const [k, l] = Array.isArray(a) ? a : [a, a]; return `<option value="${E(k)}"${String(k) === String(v) ? ' selected' : ''}>${E(l)}</option>`; }).join('');
-  const startVal = s => !s || s === 'origin' ? 'origin' : s.tee ? 'tee:' + s.tee : s.start_of ? 'start_of:' + s.start_of : s.end_of ? 'end_of:' + s.end_of : 'origin';
-  const parseStart = v => { if (v === 'origin') return 'origin'; const [k, x] = v.split(':'); return { [k]: x }; };
+  const startVal = s => !s || s === 'origin' ? 'origin' : s.equip ? 'equip' : s.nozzle ? 'nozzle:' + s.nozzle.tag : s.tee ? 'tee:' + s.tee : s.start_of ? 'start_of:' + s.start_of : s.end_of ? 'end_of:' + s.end_of : 'origin';
+  const parseStart = (v, old) => { if (v === 'origin') return 'origin'; if (v === 'equip') return { equip: (old && old.equip) || { kind: 'vessel', tag: 'V-001', nozzle: 'N1' } }; const [k, x] = v.split(':'); if (k === 'nozzle') return { nozzle: { tag: x, n: (old && old.nozzle && old.nozzle.n) || 'DIS' } }; return { [k]: x }; };
 
   function rowHtml(ri, si, p, err) {
     const t = p.t, c = (k, html) => `<td>${html}</td>`, inp = (k, v, w) => `<input data-s="${ri}.${si}.${k}" value="${E(v == null ? '' : v)}" style="width:${w || 70}px">`;
@@ -350,6 +406,7 @@ RULES
     else if (t === 'reducer') extra = sel('rt', [['conc', '동심(CONC)'], ['ecc', '편심(ECC)']], p.rt || 'conc') + ' → ' + sel('nps2', SIZES.map(v => [v, nf(v)]), p.nps2);
     else if (t === 'inst') extra = sel('kind', P.IK, p.kind || 'FT') + ' 태그 ' + inp('tag', p.tag, 90);
     else if (t === 'end') extra = sel('end', ENDS, p.end || 'open');
+    else if (t === 'equip') extra = sel('kind', EQK, p.kind || 'pump') + ' 태그 ' + inp('tag', p.tag, 80) + ' 노즐 ' + inp('nozzle', p.nozzle || (p.kind === 'pump' || !p.kind ? 'SUC' : 'N1'), 50) + (p.kind === 'pump' || !p.kind ? ' 다른 노즐 ' + sel('nps2', [['', '(자동)']].concat(SIZES.map(v => [v, nf(v)])), p.nps2 || '') : '');
     return `<tr class="${p.conf === 'low' ? 'low' : ''}${err ? ' err' : ''}"><td>${si + 1}</td>${c('t', sel('t', Object.entries(STEP), t))}${c('d', inp('d', p.d, 64))}<td>${extra}</td>${c('note', inp('note', p.note, 140))}<td class="nw"><button data-tr="up" data-ri="${ri}" data-si="${si}" title="위로">↑</button><button data-tr="dn" data-ri="${ri}" data-si="${si}" title="아래로">↓</button><button data-tr="ins" data-ri="${ri}" data-si="${si}" title="아래에 추가">＋</button><button data-tr="del" data-ri="${ri}" data-si="${si}" title="삭제">✕</button></td></tr>${err ? `<tr class="err"><td></td><td colspan="5">⚠ ${E(err)}</td></tr>` : ''}`;
   }
 
@@ -360,8 +417,9 @@ RULES
     R.runs.forEach(r => { if (!Array.isArray(r.steps)) r.steps = []; });
     (errs || []).forEach(e => { em[e.ri + '.' + e.si] = (em[e.ri + '.' + e.si] ? em[e.ri + '.' + e.si] + ' / ' : '') + e.msg; });
     const teeIds = [], runIds = R.runs.map(r => r.id);
-    R.runs.forEach(r => r.steps.forEach(p => { if ((p.t === 'tee' || p.t === 'tee_in') && p.id) teeIds.push(p.id); }));
-    const startOpts = [['origin', '원점 (첫 구간)']].concat(teeIds.map(i => ['tee:' + i, '티 ' + i + ' 에서'])).concat(runIds.flatMap(i => [['start_of:' + i, i + ' 시작점에서 (반대 방향)'], ['end_of:' + i, i + ' 끝점에서']]));
+    const eqTags = [];
+    R.runs.forEach(r => { if (r.start && r.start.equip && r.start.equip.tag) eqTags.push(r.start.equip.tag); r.steps.forEach(p => { if ((p.t === 'tee' || p.t === 'tee_in') && p.id) teeIds.push(p.id); if (p.t === 'equip' && p.tag && !eqTags.includes(p.tag)) eqTags.push(p.tag); }); });
+    const startOpts = [['origin', '원점 (첫 구간)'], ['equip', '장치에서 시작 (첫 구간)']].concat(eqTags.map(t => ['nozzle:' + t, t + ' 노즐에서'])).concat(teeIds.map(i => ['tee:' + i, '티 ' + i + ' 에서'])).concat(runIds.flatMap(i => [['start_of:' + i, i + ' 시작점에서 (반대 방향)'], ['end_of:' + i, i + ' 끝점에서']]));
     const lowN = R.runs.reduce((a, r) => a + r.steps.filter(p => p.conf === 'low').length, 0);
     const h = `<div class="tbw">
  <div class="tbimg"><div class="row"><button data-tr="zoom">확대/축소</button><span class="mut">도면을 보면서 오른쪽 표를 확인하세요.</span></div><div class="tbcv"><canvas id="tbcv"></canvas></div></div>
@@ -374,7 +432,7 @@ RULES
   <div class="row tbh"><label>라인 번호 <input data-h="line_no" value="${E(R.line_no || '')}" style="width:220px"></label><label>제목 <input data-h="title" value="${E(R.title || '')}" style="width:220px"></label><label>기본 사이즈 <select data-h="nps">${opt(SIZES.map(v => [v, nf(v)]), R.nps || 4)}</select></label><label>Class <select data-h="cls">${opt([150, 300, 400, 600, 900, 1500, 2500], R.cls || 150)}</select></label></div>
   ${R.runs.map((r, ri) => `<div class="run${r.existing ? ' exr' : ''}">
    <div class="row"><b>${E(r.id || 'R' + (ri + 1))}</b>
-    <label>시작 <select data-r="${ri}.start">${opt(startOpts, startVal(r.start))}</select></label>
+    <label>시작 <select data-r="${ri}.start">${opt(startOpts, startVal(r.start))}</select></label>${r.start && r.start.equip ? `<label>장치 <select data-r="${ri}.start.kind">${opt(EQK, r.start.equip.kind)}</select></label><label>태그 <input data-r="${ri}.start.tag" value="${E(r.start.equip.tag || '')}" style="width:80px"></label><label>노즐 <input data-r="${ri}.start.nozzle" value="${E(r.start.equip.nozzle || '')}" style="width:50px"></label>` : ''}${r.start && r.start.nozzle ? `<label>노즐 <input data-r="${ri}.start.n" value="${E(r.start.nozzle.n || '')}" style="width:50px"></label>` : ''}
     <label>방향 <select data-r="${ri}.dir">${opt([['', '(티 방향 따름)']].concat(DIRS.map(d => [d, DIRL[d]])), r.dir || '')}</select></label>
     <label>사이즈 <select data-r="${ri}.nps">${opt([['', '(이어받음)']].concat(SIZES.map(v => [v, nf(v)])), r.nps || '')}</select></label>
     <label><input type="checkbox" data-r="${ri}.existing"${r.existing ? ' checked' : ''}> 기존 배관</label>
@@ -404,7 +462,7 @@ RULES
     if (!T || !(ds.s || ds.r || ds.h)) return;
     const R = T.R, v = t.type === 'checkbox' ? t.checked : t.value;
     if (ds.h) setPath(R, ds.h, v);
-    else if (ds.r) { const [ri, k] = ds.r.split('.'); const r = R.runs[+ri]; if (k === 'start') r.start = parseStart(v); else setPath(r, k, v); }
+    else if (ds.r) { const [ri, k] = ds.r.split('.'); const r = R.runs[+ri]; if (k === 'start') { const k2 = ds.r.split('.')[2]; if (k2) { const o = r.start.equip || r.start.nozzle; o[k2] = v; } else { r.start = parseStart(v, r.start); render(T.lastErrs); } } else setPath(r, k, v); }
     else { const [ri, si, k] = ds.s.split('.'); const p = R.runs[+ri].steps[+si]; setPath(p, k, v); if (k !== 'note') delete p.conf; if (k === 't') { render(); } }
     persist();
   }
