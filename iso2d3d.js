@@ -670,6 +670,172 @@ RULES
     render();
   }
 
+
+  /* ================= 질문식 3D 변환 (한 번에 하나씩) ================= */
+  let W = null;
+  const QS = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24];
+  const phasesOf = s => (['flange', 'valve'].includes(s.t) && !s.okType ? ['type'] : []).concat(s.t === 'tee' && !s.okBranch ? ['branch'] : []).concat(s.okLen ? [] : ['len']).concat(s.t === 'end' && !s.okEnd ? ['end'] : []);
+  function wRemain() { let n = W.q.phase === 'size' ? 1 : 0; W.R.runs.forEach(r => r.steps.forEach(s => { n += phasesOf(s).length; })); return n; }
+  function wFirstPhase() {
+    while (W.q.ri < W.R.runs.length) {
+      const r = W.R.runs[W.q.ri];
+      while (W.q.si < r.steps.length) { const ph = phasesOf(r.steps[W.q.si]); if (ph.length) { W.q.phase = ph[0]; return true; } W.q.si++; }
+      W.q.ri++; W.q.si = 0;
+    }
+    // 앞쪽에 남은 질문(건너뛴 것)이 있으면 그리로
+    for (let ri = 0; ri < W.R.runs.length; ri++) for (let si = 0; si < W.R.runs[ri].steps.length; si++) { const ph = phasesOf(W.R.runs[ri].steps[si]); if (ph.length) { W.q = { ri, si, phase: ph[0] }; return true; } }
+    W.q.phase = 'done'; return false;
+  }
+  function wAdvance() { if (W.q.phase === 'size') W.q = { ri: 0, si: 0, phase: null }; else W.q.phase = null; wFirstPhase(); }
+  const wSnap = () => W.hist.push(JSON.stringify({ R: W.R, q: W.q }));
+  async function wizard(fid) {
+    const f = (await P.fAll()).find(x => x.id === fid); if (!f) return;
+    P.ov('3D로 바꾸기 — ' + f.name, `<div class="wz"><p><b>도면을 살펴보는 중…</b></p></div>`);
+    $('iso3').hidden = true; $('isop').hidden = true;
+    if (f.type !== 'application/pdf' || !window.P3DVEC) return wFail(f, '이 파일은 이미지라서 선을 자동으로 찾을 수 없습니다.');
+    let res;
+    try { const L = await P.pdfLib(); res = await window.P3DVEC.extract(L, new Uint8Array(await f.blob.arrayBuffer())); } catch (e) { return wFail(f, '도면을 읽지 못했습니다 (' + e.message + ').'); }
+    if (!res.route || !res.route.runs.length) return wFail(f, '이 도면에서는 배관 선을 자동으로 찾지 못했습니다. (스캔본이거나 그리는 방식이 다른 도면)');
+    const big = document.createElement('canvas');
+    await P.drawFile(f, big, 3200);
+    W = { f, fid, R: res.route, ext: res, big, k: big.width / res.page.W, q: { ri: 0, si: 0, phase: 'size' }, hist: [], src: 'iso:' + fid };
+    W.R.runs.forEach(r => r.steps.forEach(s => { if (s.t === 'valve') { delete s.vt; } }));
+    wRender();
+  }
+  function wFail(f, why) {
+    P.ov('3D로 바꾸기 — ' + f.name, `<div class="wz"><p><b>${E(why)}</b></p><p>이럴 때는 이렇게 해 주세요.</p><ul><li><b>Claude 대화</b>에 이 도면을 올리고 "3D로 바꿔줘"라고 하면 모델 파일을 만들어 드립니다 → 앱에서 <b>데이터 저장/불러오기 → 모델 파일 추가</b>.</li><li>또는 <b>고급 편집</b>에서 직접 입력할 수 있습니다.</li></ul><div class="row"><button data-att="back">← 첨부 목록</button><button data-att="table">고급 편집</button></div></div>`);
+    $('iso3').hidden = true; $('isop').hidden = true;
+    const b = document.querySelector('.wz [data-att=table]'); if (b) b.onclick = e => { e.stopPropagation(); table(f.id); };
+  }
+  function wView(pts, mode) {
+    // 질문 대상 부분을 확대해서 그린다 (표시는 옅게)
+    const cv = $('wzcv'), mini = $('wzmini'); if (!cv) return;
+    const K = W.k, xs = pts.map(p => p[0] * K), ys = pts.map(p => p[1] * K);
+    let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const m = Math.max(70 * K, (Math.max(x1 - x0, y1 - y0)) * 0.45);
+    x0 -= m; x1 += m; y0 -= m; y1 += m;
+    const VW = cv.width, VH = cv.height, asp = VW / VH;
+    let w = x1 - x0, h = y1 - y0; if (w / h > asp) { const nh = w / asp; y0 -= (nh - h) / 2; h = nh; } else { const nw = h * asp; x0 -= (nw - w) / 2; w = nw; }
+    const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, VW, VH);
+    g.drawImage(W.big, x0, y0, w, h, 0, 0, VW, VH);
+    const sc = VW / w, T2 = p => [(p[0] * K - x0) * sc, (p[1] * K - y0) * sc];
+    if (mode === 'seg' && pts.length >= 2) {
+      const a = T2(pts[0]), b = T2(pts[1]);
+      g.strokeStyle = 'rgba(37,99,235,.22)'; g.lineWidth = 16; g.lineCap = 'round'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      [a, b].forEach(p => { g.strokeStyle = 'rgba(220,38,38,.9)'; g.lineWidth = 2.5; g.beginPath(); g.arc(p[0], p[1], 13, 0, 7); g.stroke(); });
+    } else pts.forEach(p0 => { const p = T2(p0); g.strokeStyle = 'rgba(220,38,38,.9)'; g.lineWidth = 3; g.beginPath(); g.arc(p[0], p[1], 26, 0, 7); g.stroke(); });
+    if (mini) { const mg = mini.getContext('2d'), ms = mini.width / W.big.width; mini.height = Math.round(W.big.height * ms); mg.drawImage(W.big, 0, 0, mini.width, mini.height); mg.strokeStyle = '#dc2626'; mg.lineWidth = 2; mg.strokeRect(x0 * ms, y0 * ms, w * ms, h * ms); }
+  }
+  function wRender() {
+    const R = W.R, q = W.q, r = R.runs[q.ri], s = r && r.steps[q.si];
+    const done0 = W.hist.length, total = done0 + wRemain(), idx = Math.min(total, done0 + 1);
+    const btn = (v, l, cls) => `<button data-wz="${E(String(v))}"${cls ? ` class="${cls}"` : ''}>${l}</button>`;
+    let title = '', body = '', pts = [], mode = 'pt';
+    const branchNote = r && r.start && r.start.tee ? '<span class="wzt">갈라진 배관</span> ' : '';
+    if (q.phase === 'size') {
+      pts = [R.runs[0]._p0];
+      title = '여기서 배관이 시작합니다. 배관 크기는 몇 인치인가요?';
+      body = `<div class="wzb">${QS.map(v => btn('size:' + v, nf(v), (+R.nps === v ? 'on' : ''))).join('')}</div>
+        <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label></div>`;
+    } else if (q.phase === 'done') {
+      const n = R.runs.reduce((a, x) => a + x.steps.length, 0);
+      title = '질문이 끝났습니다.';
+      body = `<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
+      pts = R.runs.flatMap(x => [x._p0].concat(x.steps.map(y => y._p))).filter(Boolean);
+    } else if (s) {
+      const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
+      if (q.phase === 'type') {
+        pts = [s._p];
+        title = branchNote + '빨간 원 안의 표시는 무엇인가요?';
+        body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브')}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브')}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
+      } else if (q.phase === 'branch') {
+        pts = [s._p];
+        title = branchNote + '여기서 배관이 갈라집니다. 갈라지는 쪽 배관 크기는?';
+        const cur = +r.nps || +R.nps || 4;
+        body = `<div class="wzb">${btn('br:' + cur, '같은 크기 (' + nf(cur) + ')', 'on')}${QS.filter(v => v < cur).reverse().map(v => btn('br:' + v, nf(v))).join('')}${btn('br:none', '갈라지는 곳 아님', 'ghost')}</div>`;
+      } else if (q.phase === 'len') {
+        pts = [prev, s._p]; mode = 'seg';
+        const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
+        title = branchNote + `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?`;
+        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>`;
+      } else if (q.phase === 'end') {
+        pts = [s._p];
+        title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?';
+        body = `<div class="wzb">${btn('end:open', '기존 배관에 연결 / 용접')}${btn('end:cap', '캡')}${btn('end:blind', '블라인드 플랜지')}${btn('end:flange', '플랜지 (열림)')}${btn('end:pump', '펌프')}${btn('end:vessel', '베셀·탑')}${btn('end:drum', '드럼')}${btn('end:hx', '열교환기')}</div><div class="row wzs"><label>장치 번호 (장치일 때) <input id="wztag" placeholder="예: P-101A"></label></div>`;
+      }
+    }
+    const pct = Math.round(idx / total * 100);
+    P.ov('3D로 바꾸기 — ' + W.f.name, `<div class="wz">
+ <div class="wzhd"><div class="wzbar"><i style="width:${q.phase === 'done' ? 100 : pct}%"></i></div><span class="mut">${q.phase === 'done' ? '완료' : idx + ' / ' + total}</span></div>
+ <div class="wzmain"><canvas id="wzcv" width="1100" height="560"></canvas><canvas id="wzmini" width="220" height="150"></canvas></div>
+ <h3 class="wzq">${title}</h3>${body}
+ <div class="row wzft"><button data-wz="back"${W.hist.length ? '' : ' disabled'}>← 이전</button><span style="flex:1"></span><button data-att="back">그만두기</button><button data-wz="adv" class="ghost">고급 편집</button></div>
+ <div id="wzmsg" class="mut"></div></div>`);
+    $('iso3').hidden = true; $('isop').hidden = true;
+    wView(pts.filter(Boolean), mode);
+    const d = $('wzd'); if (d) { d.focus(); d.onkeydown = e => { if (e.key === 'Enter') wAnswer('len'); }; }
+  }
+  function wAnswer(a) {
+    const R = W.R, q = W.q, r = R.runs[q.ri], s = r && r.steps[q.si];
+    if (a === 'back') { const h = W.hist.pop(); if (h) { const o = JSON.parse(h); W.R = o.R; W.q = o.q; } wRender(); return; }
+    if (a === 'adv') { const f = W.f; f.route = W.R; P.fPut(f).then(() => table(W.fid)); return; }
+    if (a === 'build') { wBuild(); return; }
+    wSnap();
+    const [k, v] = a.split(':');
+    if (k === 'size') { R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; wAdvance(); }
+    else if (k === 'type') {
+      if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
+      else { if (v === 'flange') { s.t = 'flange'; delete s.vt; } else { s.t = 'valve'; s.vt = v; s.conn = 'flg'; } s.okType = true; wAdvance(); }
+    }
+    else if (k === 'br') {
+      if (v === 'none') { // 티가 아니면: 이 티에서 시작한 갈라진 배관을 지움
+        const id = s.id; s.t = 'flange'; s.okType = false; delete s.id; delete s.branch; delete s.nps2;
+        const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); R.runs = R.runs.filter(x => !(x.start && x.start.tee === id)); W.q.phase = null; wFirstPhase();
+      } else { s.nps2 = +v; s.okBranch = true; R.runs.forEach(x => { if (x.start && x.start.tee === s.id) x.nps = +v; }); wAdvance(); }
+    }
+    else if (k === 'len') {
+      if (v !== 'skip') { const el = $('wzd'), n = +(el && el.value); if (!(n > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '숫자를 입력해 주세요. 치수가 안 보이면 "치수가 안 보임"을 누르세요.'; return; } s.d = n; delete s.conf; delete s.est; }
+      s.okLen = true; wAdvance();
+    }
+    else if (k === 'end') {
+      const tag = (($('wztag') || {}).value || '').trim();
+      if (['pump', 'vessel', 'drum', 'hx'].includes(v)) { s.t = 'equip'; s.kind = v; s.tag = tag || ({ pump: 'P', vessel: 'V', drum: 'D', hx: 'E' }[v] + '-?'); s.nozzle = v === 'pump' ? 'SUC' : 'N1'; }
+      else s.end = v;
+      s.okEnd = true; wAdvance();
+    }
+    wRender();
+  }
+  function wBuild() {
+    const b = buildRoute(W.R, W.src);
+    P.removeWhere(o => o.src === W.src);
+    if (b.objs.length) P.loadModel(Object.assign(b, { name: W.f.name.replace(/\.pdf$/i, '') }));
+    const f = W.f; f.route = W.R; P.fPut(f);
+    const ids = P.getObjs().filter(o => o.src === W.src && !o.ex).map(o => o.id);
+    P.ov('3D로 바꾸기 — 완료', `<div class="wz"><h3 class="wzq">3D를 만들었습니다 (부품 ${b.objs.length}개).</h3>
+${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 있습니다 (예: 앞 부품과 길이가 겹침). 3D를 보고 이상하면 "이전 단계로" 돌아가 길이를 고치거나, 고급 편집에서 확인하세요.</p>` : ''}
+<div class="wzb"><button data-wz="see3d" class="pri big">3D로 보기</button><button data-wz="seeiso" class="big">ISO로 원본과 비교</button></div>
+<div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button><span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
+    $('iso3').hidden = true; $('isop').hidden = true;
+    W.built = ids;
+  }
+  function wClick(e) {
+    const b = e.target.closest('[data-wz]'); if (!b || !W) return;
+    const a = b.dataset.wz;
+    if (a === 'see3d') { P.focus(P.getObjs().filter(o => o.src === W.src).map(o => o.id)); return; }
+    if (a === 'seeiso') { if (W.built && W.built.length) P.showIso(W.built[0]); return; }
+    if (a === 'again') { W.q = { ri: 0, si: 0, phase: 'done' }; wRender(); return; }
+    wAnswer(a);
+  }
+  document.getElementById('isob').addEventListener('click', wClick);
+  const wcss = document.createElement('style');
+  wcss.textContent = `.wz{max-width:1150px;margin:0 auto}.wzhd{display:flex;align-items:center;gap:10px;margin-bottom:8px}.wzbar{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}.wzbar i{display:block;height:100%;background:#0f766e}
+.wzmain{position:relative;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;background:#fff}#wzcv{display:block;width:100%;height:auto}#wzmini{position:absolute;right:8px;bottom:8px;width:200px;border:1px solid #94a3b8;background:#fff;opacity:.92}
+.wzq{font-size:20px;margin:14px 0 10px}.wzt{display:inline-block;background:#e0f2fe;color:#075985;border-radius:4px;padding:1px 8px;font-size:14px;vertical-align:middle}
+.wzb{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.wzb button{font-size:17px;padding:10px 16px;border-radius:8px;min-width:90px}.wzb button.on{outline:3px solid #0f766e}.wz button.big{font-size:18px;padding:12px 22px}.wz button.ghost{background:#f8fafc;color:#475569}
+.wzs{gap:12px;flex-wrap:wrap;margin:8px 0}.wzs input{font-size:16px;padding:6px}.wzft{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:10px}
+@media(max-width:700px){#wzmini{display:none}.wzq{font-size:17px}}`;
+  document.head.appendChild(wcss);
+
   document.getElementById('isob').addEventListener('change', onChange);
   document.getElementById('isob').addEventListener('click', onClick);
   const css = document.createElement('style');
@@ -683,5 +849,5 @@ RULES
 @media(max-width:900px){.tbw{grid-template-columns:1fr}.tbimg{position:static}}`;
   document.head.appendChild(css);
 
-  window.P3DX = { convert, table, settings, manual, buildRoute, SYS, _aiRead: aiRead, _tiles: tiles };
+  window.P3DX = { wizard, convert, table, settings, manual, buildRoute, SYS, _aiRead: aiRead, _tiles: tiles };
 })();
