@@ -803,9 +803,9 @@ RULES
       const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
       if (q.phase === 'type') {
         pts = [s._p];
-        title = branchNote + '빨간 원 안의 표시는 무엇인가요?' + (s.vguess ? ' <span class="wzt">밸브 모양으로 보임</span>' : '');
+        title = branchNote + '빨간 원 안의 표시는 무엇인가요?' + (s.vguess ? ' <span class="wzt">' + (s.vguess === 'check' ? '플랜지 ─ 체크 밸브 ─ 플랜지 모양으로 보임' : '밸브 모양으로 보임') + '</span>' : '');
         const on = v => (s.vguess === v ? 'on' : '');
-        body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브' + (s.vguess === 'gate' ? ' (플랜지형)' : ''), on('gate'))}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브')}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
+        body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브' + (s.vguess === 'gate' ? ' (플랜지형)' : ''), on('gate'))}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브' + (s.vguess === 'check' ? ' (플랜지형)' : ''), on('check'))}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
       } else if (q.phase === 'vsize') {
         pts = [s._p];
         const cur = npsAt(q.ri, q.si);

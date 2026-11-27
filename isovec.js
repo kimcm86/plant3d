@@ -248,6 +248,22 @@
         const xi = isect(l, m); if (xi && dist(xi.X, p) < 9 && xi.sm > m.s0 - 2 && xi.sm < m.s1 + 2) drop.add(m); });
     });
     for (let i = pipes.length - 1; i >= 0; i--) if (drop.has(pipes[i])) pipes.splice(i, 1);
+    // 체크 밸브 등 '플랜지 면 ─ 몸통 ─ 플랜지 면' 기호: 배관을 가로지르는 면 획 두 무리가 6~16pt 떨어져 있고,
+    // 그 사이를 아이소 축이 아닌 빗선이 가로지르면 플랜지형 밸브(체크 밸브로 추정)
+    pipes.forEach(l => {
+      const la = LINES.find(x => x[0] === l.ax)[1], cross = [], diag = [];
+      segs.forEach(q => { if (q.isFill) return; const [a, b] = q, n = dist(a, b); if (n < 4 || n > 25) return;
+        const oa = a[0] * l.n[0] + a[1] * l.n[1] - l.off, ob = b[0] * l.n[0] + b[1] * l.n[1] - l.off; if (!(oa * ob < 0) || Math.max(Math.abs(oa), Math.abs(ob)) > 13) return;
+        const t = oa / (oa - ob), X = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], sx = X[0] * l.u[0] + X[1] * l.u[1]; if (sx < l.s0 - 1 || sx > l.s1 + 1) return;
+        const ang = deg(b[0] - a[0], b[1] - a[1]); if (angDiff(ang, la) < 10) return;
+        if (isoAng(ang)) { if (n <= 14) cross.push(sx); } else if (n >= 7) diag.push(sx); });
+      cross.sort((x, y) => x - y); const g = []; cross.forEach(v => { const c = g[g.length - 1]; if (c && v - c.e < 3) c.e = v; else g.push({ b: v, e: v }); });
+      for (let i = 0; i + 1 < g.length; i++) { const A1 = g[i], B1 = g[i + 1], gap = B1.b - A1.e; if (gap < 6 || gap > 16) continue;
+        const inn = diag.filter(v => v > A1.e + 1 && v < B1.b - 1); if (!inn.length) continue;
+        const sv = (A1.e + B1.b) / 2; if ((l.feats || []).some(f => f.t === 'valve' && f.iso && Math.abs(f.s - sv) < 10)) continue;
+        l.feats = (l.feats || []).filter(f => !(Math.abs(f.s - sv) < gap / 2 + 4)); // 양쪽 플랜지 표시는 밸브(플랜지형)에 포함
+        l.feats.push({ t: 'valve', s: sv, vt: 'check', iso: true, vg: 'check' }); l.feats.sort((x, y) => x.s - y.s); i++; }
+    });
     // 레듀서(사다리꼴): 배관 양옆에서 같은 쪽으로 좁아지는 빗선 2개 (배관 축을 가로지르지 않음)
     pipes.forEach(l => {
       const sd = segs.filter(q => !q.isFill).map(([a, b]) => ({ a, b, len: dist(a, b), ang: deg(b[0] - a[0], b[1] - a[1]) })).filter(q => q.len >= 4 && q.len < 20 && !isoAng(q.ang)).map(q => {
@@ -360,7 +376,7 @@
         else if (d !== dir) { put({ t: 'elbow', to: d, conf: 'low' }, node.p); dir = d; }
         // 구간 안 기호(진행 방향 순서)
         const fs = e.feats.map(f => ({ f, p: pt(e.l, f.s) })).sort((a, b) => dist(node.p, a.p) - dist(node.p, b.p));
-        fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : f.t === 'reducer' ? { t: 'reducer', rt: 'conc', conf: 'low' } : Object.assign({ t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, f.iso ? { vguess: 'gate' } : {}), p));
+        fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : f.t === 'reducer' ? { t: 'reducer', rt: 'conc', conf: 'low' } : Object.assign({ t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, f.iso ? { vguess: f.vg || 'gate' } : {}), p));
         node = other;
         const rest = node.edges.filter(x => !used.has(x));
         if (!rest.length) {
