@@ -93,12 +93,14 @@
       const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); if (L < 2) return;
       const u = [(p1[0] - p0[0]) / L, (p1[1] - p0[1]) / L], sa = Math.atan2(u[1], u[0]) * 180 / Math.PI;
       nums.forEach((n, ni) => {
-        let da = Math.abs(((n.ang - sa) % 180 + 180) % 180); da = Math.min(da, 180 - da);
+        const adiff = (x, y) => { let q = Math.abs(((x - y) % 180 + 180) % 180); return Math.min(q, 180 - q); };
+        let da = adiff(n.ang, sa), off = false;
+        if (s.rollSeg && s.legA) { const dl = Math.min(...s.legA.map(x => adiff(n.ang, x))); da = dl; off = true; } // 경사 구간: 빗금 삼각형 변(오프셋) 치수
         if (da > 18) return;                                  // 글자 방향이 배관 방향과 같아야 함
         const v = [n.p[0] - p0[0], n.p[1] - p0[1]], t = (v[0] * u[0] + v[1] * u[1]) / L, d = Math.abs(v[0] * u[1] - v[1] * u[0]);
         if (t < -0.25 || t > 1.25 || d > 45) return;
         const sc = d + Math.abs(t - 0.5) * L * 0.35 + da * 0.4 - n.c * 0.05;
-        cands.push({ ri, si, ni, sc });
+        cands.push({ ri, si, ni, sc, off });
       });
     }));
     cands.sort((a, b) => a.sc - b.sc);
@@ -109,7 +111,7 @@
       const n = nums[c.ni], s = route.runs[c.ri].steps[c.si];
       // 값이 다른 후보가 거의 비슷한 자리에 있으면 '헷갈림' 표시 → 사용자에게 확인
       const alt = cands.find(o => o.ri === c.ri && o.si === c.si && o.ni !== c.ni && nums[o.ni].v !== n.v && !used.has(o.ni));
-      s.ocr = { v: n.v, c: n.c, p: n.p, h: n.h, amb: !!(alt && alt.sc - c.sc < 8) };
+      s.ocr = { v: n.v, c: n.c, p: n.p, h: n.h, amb: !!(alt && alt.sc - c.sc < 8), off: !!c.off };
     });
     return done.size;
   }

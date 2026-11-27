@@ -189,6 +189,7 @@
     const clen = new Array(nc).fill(0); bridged.forEach((l, i) => { if (cid[i] >= 0) clen[cid[i]] += l.len; });
     const cdot = new Array(nc).fill(0); bridged.forEach((l, i) => { if (cid[i] >= 0) cdot[cid[i]] += dots.filter(d => onL(l, d, 1.1)).length; });
     const pipes = bridged.filter((l, i) => keep[i] && (clen[cid[i]] >= 60 || cdot[cid[i]] >= 3));
+    const skews = findSkews(segs, pipes, arrows);
     // 플랜지·밸브 기호: 배관 위를 가로지르는 짧은 선 무리
     const shortS = segs.filter(q => !q.isFill).map(([a, b]) => ({ a, b, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], len: dist(a, b), ang: deg(b[0] - a[0], b[1] - a[1]) })).filter(s => s.len > 1.5 && s.len < 16);
     pipes.forEach(l => {
@@ -290,14 +291,111 @@
         const sides = par.some(q => q.o > 0) && par.some(q => q.o < 0), bottom = near.some(q => angDiff(q.ang, la) > 20 && q.s > 0.3 && Math.abs(q.o) < 3);
         if (sides && bottom) caps.push(e); // ㄷ 모양: 배관 양옆 평행선 + 끝을 막는 선
       }); });
-    return { pipes, dots, arrows, merged, P, valves, caps };
+    return { pipes, dots, arrows, merged, P, valves, caps, skews };
+  }
+
+  /* 2-b) 비스듬한 배관(경사·롤링): 아이소 축(30°·90°·150°)이 아닌 실선이 두 배관 끝을 잇는 것.
+     빗금 삼각형(두 변이 아이소 축)으로 어느 면에서 꺾였는지 판단한다. */
+  const AXV = { X: AX['+X'], Z: AX['+Z'], Y: AX['+Y'] };
+  const PAIRS = [['X', 'Z', 'H'], ['X', 'Y', 'VX'], ['Z', 'Y', 'VZ']]; // H=수평(바닥면), VX=동서로 오르내림, VZ=남북으로 오르내림
+  const sgn = v => (v >= 0 ? '+' : '-');
+  // 쌍(p,q)과 부호로 3D 대각선 방향 키 ('+X-Z' 처럼, 앱의 DIR 키 순서: X→Z→Y)
+  const diagKey = (p, q, a, b) => sgn(a) + p + sgn(b) + q;
+  function decompose(v, p, q) { const U = AXV[p], V = AXV[q], det = U[0] * V[1] - U[1] * V[0]; if (Math.abs(det) < 1e-6) return null; return [(v[0] * V[1] - v[1] * V[0]) / det, (U[0] * v[1] - U[1] * v[0]) / det]; }
+  function inTri(m, A, B, C) { const s = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]); const d1 = s(m, A, B), d2 = s(m, B, C), d3 = s(m, C, A); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); }
+  function rollPlane(segs, a, b, onlyPairs) {
+    const v = [b[0] - a[0], b[1] - a[1]], res = [];
+    const shrink = (A, B, C) => { const g = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3], k = 0.88, f = P0 => [g[0] + (P0[0] - g[0]) * k, g[1] + (P0[1] - g[1]) * k]; return [f(A), f(B), f(C)]; };
+    const legCov = (P1, P2) => { const L = dist(P1, P2); if (L < 2) return 1; const u = [(P2[0] - P1[0]) / L, (P2[1] - P1[1]) / L], n = [-u[1], u[0]]; let cov = 0;
+      segs.forEach(q => { if (q.isFill) return; const [x, y] = q, sx = (x[0] - P1[0]) * u[0] + (x[1] - P1[1]) * u[1], sy = (y[0] - P1[0]) * u[0] + (y[1] - P1[1]) * u[1], ox = (x[0] - P1[0]) * n[0] + (x[1] - P1[1]) * n[1], oy = (y[0] - P1[0]) * n[0] + (y[1] - P1[1]) * n[1];
+        if (Math.abs(ox) > 1 || Math.abs(oy) > 1) return; const s0 = Math.max(0, Math.min(sx, sy)), s1 = Math.min(L, Math.max(sx, sy)); if (s1 > s0) cov += s1 - s0; }); return Math.min(1, cov / L); };
+    PAIRS.forEach(([p, q, pl]) => {
+      if (onlyPairs && !onlyPairs.includes(pl)) return;
+      const ab = decompose(v, p, q); if (!ab) return;
+      const [al, be] = ab; if (Math.abs(al) < 2 || Math.abs(be) < 2) return;
+      [[a[0] + AXV[p][0] * al, a[1] + AXV[p][1] * al], [a[0] + AXV[q][0] * be, a[1] + AXV[q][1] * be]].forEach(C => {
+        const T = shrink(a, b, C); let hatch = 0;
+        const ap = deg(AXV[p][0], AXV[p][1]), aq = deg(AXV[q][0], AXV[q][1]);
+        segs.forEach(sq => { if (sq.isFill) return; const [x, y] = sq, l = dist(x, y); if (l < 2.5 || l > 60) return; const an = deg(y[0] - x[0], y[1] - x[1]); if (angDiff(an, ap) > 4 && angDiff(an, aq) > 4) return; // 빗금 = 한 변과 나란한 선
+          const m = [(x[0] + y[0]) / 2, (x[1] + y[1]) / 2]; if (inTri(m, T[0], T[1], T[2])) hatch++; });
+        const lc = (legCov(a, C) + legCov(C, b)) / 2;
+        res.push({ pl, p, q, al, be, C, hatch, lc, sc: Math.min(hatch, 12) + lc * 6 });
+      });
+    });
+    res.sort((x, y) => y.sc - x.sc);
+    const best = res[0], H = res.find(x => x.pl === 'H') || best;
+    if (!best) return null;
+    const pick = best.sc >= 3 ? best : H; // 증거가 없으면 수평으로 가정 (질문에서 바꿈)
+    const alts = {}; PAIRS.forEach(([p, q, pl]) => { const ab = decompose(v, p, q); if (ab) alts[pl] = diagKey(p, q, ab[0], ab[1]); });
+    const ratio = Math.abs(pick.al) / (Math.abs(pick.be) || 1e-6);
+    return { legA: [Math.round(deg(AXV[pick.p][0], AXV[pick.p][1])), Math.round(deg(AXV[pick.q][0], AXV[pick.q][1]))], pl: pick.pl, lc: pick.lc, key: diagKey(pick.p, pick.q, pick.al, pick.be), alts, ang: Math.round(Math.atan2(Math.abs(pick.be), Math.abs(pick.al)) * 180 / Math.PI), sure: !!(best && best.sc >= 3), C: pick.C, hatch: pick.hatch, legs: [Math.abs(pick.al), Math.abs(pick.be)], ratio };
+  }
+  // 빗금 삼각형의 변(아이소 축 방향의 가는 선)이 배관으로 잡힌 것 지우기 / 배관에 이어 붙은 변 잘라내기
+  function legClean(pipes, P1, C) {
+    const L = dist(P1, C); if (L < 3) return;
+    const u = [(C[0] - P1[0]) / L, (C[1] - P1[1]) / L];
+    for (let i = pipes.length - 1; i >= 0; i--) {
+      const l = pipes[i]; if (Math.abs(l.u[0] * u[1] - l.u[1] * u[0]) > 0.02) continue;
+      const o = P1[0] * l.n[0] + P1[1] * l.n[1]; if (Math.abs(o - l.off) > 1) continue;
+      const t0 = (l.a[0] - P1[0]) * u[0] + (l.a[1] - P1[1]) * u[1], t1 = (l.b[0] - P1[0]) * u[0] + (l.b[1] - P1[1]) * u[1];
+      const lo = Math.min(t0, t1), hi = Math.max(t0, t1); if (Math.min(hi, L) - Math.max(lo, 0) < 3) continue;
+      if (lo > -2 && hi < L + 2) { pipes.splice(i, 1); continue; }   // 변 전체 = 배관 아님
+      if (lo < -2 && hi > 3 && hi < L + 2) { const sP = P1[0] * l.u[0] + P1[1] * l.u[1]; if (l.u[0] * u[0] + l.u[1] * u[1] > 0) l.s1 = sP; else l.s0 = sP; l.a = [l.u[0] * l.s0 + l.n[0] * l.off, l.u[1] * l.s0 + l.n[1] * l.off]; l.b = [l.u[0] * l.s1 + l.n[0] * l.off, l.u[1] * l.s1 + l.n[1] * l.off]; l.len = l.s1 - l.s0; }
+    }
+  }
+  function findSkews(segs, pipes, arrows) {
+    const isoA = a => [30, 90, 150].some(t => angDiff(a, t) < 4);
+    const S = [];
+    segs.forEach(q => { if (q.isFill) return; const [a, b] = q, len = dist(a, b); if (len < 3) return; const ang = deg(b[0] - a[0], b[1] - a[1]); if (isoA(ang)) return;
+      const t = ang * Math.PI / 180, u = [Math.cos(t), Math.sin(t)], n = [-u[1], u[0]], s0 = a[0] * u[0] + a[1] * u[1], s1 = b[0] * u[0] + b[1] * u[1];
+      S.push({ ang, u, n, off: a[0] * n[0] + a[1] * n[1], s0: Math.min(s0, s1), s1: Math.max(s0, s1) }); });
+    S.sort((p, q) => p.ang - q.ang || p.off - q.off || p.s0 - q.s0);
+    const M = [];
+    S.forEach(l => { const g = M.find(m => angDiff(m.ang, l.ang) < 0.8 && Math.abs(m.off - l.off) < 0.4 && l.s0 <= m.s1 + 2.5 && l.s1 >= m.s0 - 2.5);
+      if (g) { g.cov += Math.max(0, Math.min(l.s1, Math.max(g.s1, l.s1)) - Math.max(l.s0, g.s1)); g.s0 = Math.min(g.s0, l.s0); g.s1 = Math.max(g.s1, l.s1); } else M.push(Object.assign({ cov: l.s1 - l.s0 }, l)); });
+    const ends = []; pipes.forEach(l => { ends.push({ p: l.a, l }, { p: l.b, l }); });
+    const out = [];
+    M.forEach((m, i) => {
+      const len = m.s1 - m.s0; if (len < 15 || m.cov / len < 0.85) return; // 점선·짧은 획은 제외
+      const Pm = s0 => [m.u[0] * s0 + m.n[0] * m.off, m.u[1] * s0 + m.n[1] * m.off], a = Pm(m.s0), b = Pm(m.s1);
+      if ((arrows || []).some(ar => { const s0 = ar.tip[0] * m.u[0] + ar.tip[1] * m.u[1], o = ar.tip[0] * m.n[0] + ar.tip[1] * m.n[1]; return Math.abs(o - m.off) < 1.2 && s0 > m.s0 - 1.5 && s0 < m.s1 + 1.5; })) return; // 화살표 = 치수선·지시선
+      const snap = p => { let best = null; ends.forEach(e => { const d = dist(e.p, p); if (d < 7 && (!best || d < best.d)) best = { d, p: e.p, l: e.l }; });
+        if (!best) pipes.forEach(l => { const s0 = p[0] * l.u[0] + p[1] * l.u[1], o = p[0] * l.n[0] + p[1] * l.n[1]; if (Math.abs(o - l.off) < 1.5 && s0 > l.s0 + 2 && s0 < l.s1 - 2) { const q = [l.u[0] * s0 + l.n[0] * l.off, l.u[1] * s0 + l.n[1] * l.off]; if (!best || Math.abs(o - l.off) < best.d) best = { d: Math.abs(o - l.off), p: q, l }; } }); // 삼각형 변이 배관에 이어 그려진 경우
+        return best; };
+      const ea = snap(a), eb = snap(b); if (!ea || !eb || ea.l === eb.l) return;
+      const A2 = ea.p.slice(), B2 = eb.p.slice(), L = dist(A2, B2); if (L < 12) return;
+      const u = [(B2[0] - A2[0]) / L, (B2[1] - A2[1]) / L], n = [-u[1], u[0]], off = A2[0] * n[0] + A2[1] * n[1];
+      const roll = rollPlane(segs, A2, B2); if (!roll) return;
+      if (!(roll.hatch >= 2 || L >= 40)) return; // 빗금도 없고 짧으면 기호 획(체크 밸브 사선 등)
+      if (roll.sure) { legClean(pipes, A2, roll.C); legClean(pipes, B2, roll.C); triClean(pipes, A2, B2, roll.C); }
+      out.push({ ax: 'K' + i, u, n, off, s0: A2[0] * u[0] + A2[1] * u[1], s1: B2[0] * u[0] + B2[1] * u[1], a: A2, b: B2, len: L, cov: L, feats: [], gaps: [], roll });
+    });
+    // 아이소 축과 같은 방향으로 보이는 경사: 45° 경사는 다른 축과 겹쳐 보임 (예: X+Y = -Z 방향) → 빗금 삼각형이 있을 때만
+    const AXP = { '+X': 'X', '-X': 'X', '+Z': 'Z', '-Z': 'Z', '+Y': 'Y', '-Y': 'Y' };
+    pipes.slice().forEach(l => {
+      if (l.roll || l.len < 12) return;
+      const own = l.ax === '+X' ? 'X' : l.ax === '+Z' ? 'Z' : 'Y', allowed = PAIRS.filter(([p, q]) => p !== own && q !== own).map(x => x[2]);
+      const roll = rollPlane(segs, l.a, l.b, allowed); if (!roll || !(roll.hatch >= 3 && roll.lc >= 0.6)) return;
+      // 축 방향 그대로(경사 아님)도 고를 수 있게
+      const v = [l.b[0] - l.a[0], l.b[1] - l.a[1]]; let bk = null, bv = -2; Object.entries(AX).forEach(([k, a]) => { const d = (v[0] * a[0] + v[1] * a[1]) / (Math.hypot(v[0], v[1]) || 1); if (d > bv) { bv = d; bk = k; } });
+      roll.alts.AX = bk; roll.isoLook = true;
+      legClean(pipes, l.a, roll.C); legClean(pipes, l.b, roll.C); triClean(pipes, l.a, l.b, roll.C);
+      if (pipes.includes(l)) l.roll = roll;
+    });
+    return out;
+  }
+  // 삼각형 안의 빗금이 배관으로 잡힌 것 지우기
+  function triClean(pipes, A, B, C) {
+    const g = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3], f = P0 => [g[0] + (P0[0] - g[0]) * 1.04, g[1] + (P0[1] - g[1]) * 1.04], T = [f(A), f(B), f(C)];
+    for (let i = pipes.length - 1; i >= 0; i--) { const l = pipes[i]; if (l.roll) continue; const m = [(l.a[0] + l.b[0]) / 2, (l.a[1] + l.b[1]) / 2];
+      if (inTri(m, T[0], T[1], T[2]) && inTri(l.a, T[0], T[1], T[2]) && inTri(l.b, T[0], T[1], T[2]) && !(dist(l.a, A) < 1 && dist(l.b, B) < 1) && !(dist(l.a, B) < 1 && dist(l.b, A) < 1)) pipes.splice(i, 1); }
   }
 
   /* 3) 배관 선 → 경로표 초안 (거리 d는 비움) */
   function toRoute(A, mmpt, opt) {
     mmpt = mmpt || 50; opt = opt || {};
-    const { pipes, P } = A;
-    if (!pipes.length) return null;
+    const P = A.P, pipes = A.pipes.concat(A.skews || []);
+    if (!A.pipes.length) return null;
     const pt = (l, s) => P(l, s);
     // 노드: 선 끝점, 다른 선 위에 닿는 끝점(티)
     const keyOf = p => Math.round(p[0] / 2.5) + ',' + Math.round(p[1] / 2.5);
@@ -348,6 +446,8 @@
       if (len < 30 && !e.feats.length && o.edges.length >= 3 && !A.dots.some(d => dist(d, n.p) < 3)) { o.edges = o.edges.filter(x => x !== e); n.edges = []; }
     });
     for (let i = nodes.length - 1; i >= 0; i--) if (!nodes[i].edges.length) nodes.splice(i, 1);
+    const negD = k => k.replace(/[+-]/g, c => (c === '+' ? '-' : '+'));
+    const edgeDir = (e, from, to) => { if (!e.l.roll) return dirOf(from, to); const fw = dist(from, e.l.a) < dist(from, e.l.b); return fw ? e.l.roll.key : negD(e.l.roll.key); };
     const dirOf = (from, to) => { const v = [to[0] - from[0], to[1] - from[1]], L = Math.hypot(v[0], v[1]) || 1; let best = null, bv = -2; Object.entries(AX).forEach(([k, a]) => { const d = (v[0] * a[0] + v[1] * a[1]) / L; if (d > bv) { bv = d; best = k; } }); return best; };
     // 시작점: 차수 1 노드 중 가장 오른쪽 아래(관례상 아무 끝이나 가능)
     const ends = nodes.filter(n => n.edges.length === 1);
@@ -361,7 +461,8 @@
     while (queue.length) {
       const q = queue.shift();
       let node = q.node, prev = q.from, dir = null; const steps = []; const run = { id: q.id, start: q.start, steps, nps: '', _p0: q.node.p.slice() };
-      let last = q.node.p; const put = (st, p) => {
+      let last = q.node.p, prevRoll = null, pendRoll = false; const put = (st, p) => {
+        if (pendRoll) { st.rollSeg = true; st.legA = pendRoll.legA; pendRoll = false; }
         st.d = Math.max(10, Math.round(dist(last, p) * mmpt / 10) * 10); st._p = p.slice(); st.est = true;
         // 이 구간 위 용접점 위치 (0=앞 지점, 1=이 지점) — 엘보·플랜지가 바로 붙은 구간(배관 없음) 판정용
         const L = dist(last, p) || 1, v = [(p[0] - last[0]) / L, (p[1] - last[1]) / L];
@@ -371,9 +472,12 @@
       let e = node.edges.find(x => !used.has(x) && (!prev || x !== prev));
       while (e) {
         used.add(e);
-        const other = e.n0 === node ? e.n1 : e.n0, d = dirOf(node.p, other.p);
-        if (!dir) { dir = d; run.dir = d; }
-        else if (d !== dir) { put({ t: 'elbow', to: d, conf: 'low' }, node.p); dir = d; }
+        const other = e.n0 === node ? e.n1 : e.n0, d = edgeDir(e, node.p, other.p);
+        const rl = e.l.roll ? Object.assign({}, e.l.roll, { fw: dist(node.p, e.l.a) < dist(node.p, e.l.b) }) : null;
+        if (rl && !rl.fw) { rl.key = negD(rl.key); rl.alts = Object.fromEntries(Object.entries(rl.alts).map(([k, v]) => [k, negD(v)])); }
+        if (!dir) { dir = d; run.dir = d; if (rl) run.roll = rl; }
+        else if (d !== dir) { const el = { t: 'elbow', to: d, conf: 'low' }; if (rl) el.roll = rl; if (prevRoll || rl) el.e45 = true; put(el, node.p); dir = d; }
+        prevRoll = rl; if (rl) pendRoll = rl;
         // 구간 안 기호(진행 방향 순서)
         const fs = e.feats.map(f => ({ f, p: pt(e.l, f.s) })).sort((a, b) => dist(node.p, a.p) - dist(node.p, b.p));
         fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : f.t === 'reducer' ? { t: 'reducer', rt: 'conc', conf: 'low' } : Object.assign({ t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, f.iso ? { vguess: f.vg || 'gate' } : {}), p));
@@ -386,7 +490,7 @@
           put(st, node.p); break;
         }
         // 직진 우선, 나머지는 분기
-        const straight = rest.find(x => dirOf(node.p, (x.n0 === node ? x.n1 : x.n0).p) === dir);
+        const straight = rest.find(x => edgeDir(x, node.p, (x.n0 === node ? x.n1 : x.n0).p) === dir);
         const nextE = straight || rest[0];
         const others = rest.filter(x => x !== nextE);
         if (others.length) {
