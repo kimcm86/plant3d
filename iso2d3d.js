@@ -687,7 +687,27 @@ RULES
     W.q.phase = 'done'; return false;
   }
   function wAdvance() { if (W.q.phase === 'size') W.q = { ri: 0, si: 0, phase: null }; else W.q.phase = null; wFirstPhase(); }
-  const wSnap = () => W.hist.push(JSON.stringify({ R: W.R, q: W.q }));
+  const wSnap = () => W.hist.push(JSON.stringify({ R: W.R, q: W.q, excl: W.excl, startAt: W.startAt }));
+  // 배관 선을 다시 찾기 (빼기로 한 구간·시작점 반영). 답한 크기·라인번호는 유지
+  function wReroute() {
+    const old = W.R, nr = window.P3DVEC.reroute(W.ext, { excl: W.excl, startAt: W.startAt });
+    if (!nr || !nr.runs.length) return false;
+    nr.runs.forEach(r => r.steps.forEach(s => { if (s.t === 'valve') delete s.vt; }));
+    ['nps', 'line_no', 'cls'].forEach(k => { if (old[k] != null && old[k] !== '') nr[k] = old[k]; });
+    W.R = nr; W.q = { ri: 0, si: 0, phase: 'size' }; return true;
+  }
+  // 갈라진 배관(run)을 통째로 지우고, 그 갈래가 나온 티를 일반 배관으로 되돌림
+  function wDropRun(ri) {
+    const R = W.R, r = R.runs[ri]; R.runs.splice(ri, 1);
+    r.steps.forEach(s => { if (s.id) for (let k = R.runs.length - 1; k >= 0; k--) if (R.runs[k].start && R.runs[k].start.tee === s.id) wDropRun(k); });
+    const tid = r.start && r.start.tee; if (!tid) return;
+    R.runs.forEach(pr => { const pi = pr.steps.findIndex(s => s.id === tid); if (pi < 0) return;
+      const st = pr.steps[pi], nx = pr.steps[pi + 1];
+      if (R.runs.some(x => x.start && x.start.tee === tid)) return; // 다른 갈래가 남아 있으면 티 유지
+      if (st.t === 'tee') { if (nx) { nx.d = (+nx.d || 0) + (+st.d || 0); nx.okLen = false; } pr.steps.splice(pi, 1); }
+      else if (st.t === 'tee_in') { st.t = 'elbow'; delete st.id; delete st.run; }
+    });
+  }
   async function wizard(fid) {
     const f = (await P.fAll()).find(x => x.id === fid); if (!f) return;
     P.ov('3D로 바꾸기 — ' + f.name, `<div class="wz"><p><b>도면을 살펴보는 중…</b></p></div>`);
@@ -698,7 +718,7 @@ RULES
     if (!res.route || !res.route.runs.length) return wFail(f, '이 도면에서는 배관 선을 자동으로 찾지 못했습니다. (스캔본이거나 그리는 방식이 다른 도면)');
     const big = document.createElement('canvas');
     await P.drawFile(f, big, 3200);
-    W = { f, fid, R: res.route, ext: res, big, k: big.width / res.page.W, q: { ri: 0, si: 0, phase: 'size' }, hist: [], src: 'iso:' + fid };
+    W = { f, fid, R: res.route, ext: res, big, k: big.width / res.page.W, q: { ri: 0, si: 0, phase: 'size' }, hist: [], src: 'iso:' + fid, excl: [], startAt: 0 };
     W.R.runs.forEach(r => r.steps.forEach(s => { if (s.t === 'valve') { delete s.vt; } }));
     wRender();
   }
@@ -733,10 +753,11 @@ RULES
     let title = '', body = '', pts = [], mode = 'pt';
     const branchNote = r && r.start && r.start.tee ? '<span class="wzt">갈라진 배관</span> ' : '';
     if (q.phase === 'size') {
-      pts = [R.runs[0]._p0];
-      title = '여기서 배관이 시작합니다. 배관 크기는 몇 인치인가요?';
+      { const r0 = R.runs[0], s0 = r0.steps[0]; pts = s0 && s0._p ? [r0._p0, s0._p] : [r0._p0]; if (pts.length > 1) mode = 'seg'; }
+      title = '빨간 원에서 배관이 시작합니다 (파란 띠 = 첫 구간). 맞으면 배관 크기를 고르세요.';
       body = `<div class="wzb">${QS.map(v => btn('size:' + v, nf(v), (+R.nps === v ? 'on' : ''))).join('')}</div>
-        <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label></div>`;
+        <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label></div>
+        <div class="wzno"><span>시작점이 틀렸나요?</span>${btn('notpipe', '✕ 파란 띠는 배관이 아님 (점선·치수선 등)', 'warn')}${(R.nStarts || 1) > 1 ? btn('nextstart', '↻ 다른 끝에서 시작 (' + ((R.startIdx || 0) + 1) + ' / ' + R.nStarts + ')', 'ghost') : ''}</div>`;
     } else if (q.phase === 'done') {
       const n = R.runs.reduce((a, x) => a + x.steps.length, 0);
       title = '질문이 끝났습니다.';
@@ -757,7 +778,8 @@ RULES
         pts = [prev, s._p]; mode = 'seg';
         const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
         title = branchNote + `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?`;
-        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>`;
+        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
+        <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
         title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?';
@@ -777,9 +799,26 @@ RULES
   }
   function wAnswer(a) {
     const R = W.R, q = W.q, r = R.runs[q.ri], s = r && r.steps[q.si];
-    if (a === 'back') { const h = W.hist.pop(); if (h) { const o = JSON.parse(h); W.R = o.R; W.q = o.q; } wRender(); return; }
+    if (a === 'back') { const h = W.hist.pop(); if (h) { const o = JSON.parse(h); W.R = o.R; W.q = o.q; if (o.excl) W.excl = o.excl; if (o.startAt != null) W.startAt = o.startAt; } wRender(); return; }
     if (a === 'adv') { const f = W.f; f.route = W.R; P.fPut(f).then(() => table(W.fid)); return; }
     if (a === 'build') { wBuild(); return; }
+    const say = t => { const m = $('wzmsg'); if (m) m.textContent = t; };
+    if (a === 'notpipe' || a === 'nextstart') {
+      wSnap();
+      if (a === 'notpipe') { const r0 = R.runs[0], s0 = r0.steps[0]; W.excl.push([r0._p0, (s0 && s0._p) || r0._p0]); W.startAt = 0; } else W.startAt++;
+      if (!wReroute()) { const h = JSON.parse(W.hist.pop()); W.R = h.R; W.q = h.q; W.excl = h.excl; W.startAt = h.startAt; wRender(); say('남은 배관 선이 없습니다. "고급 편집"에서 직접 그려 주세요.'); return; }
+      wRender(); say(a === 'notpipe' ? '그 선을 빼고 배관을 다시 찾았습니다.' : '다른 끝에서 시작합니다.'); return;
+    }
+    if (a === 'cut') {
+      wSnap();
+      if (q.ri === 0 && q.si === 0) { W.excl.push([r._p0, s._p]); W.startAt = 0; if (!wReroute()) { const h = JSON.parse(W.hist.pop()); W.R = h.R; W.q = h.q; W.excl = h.excl; W.startAt = h.startAt; wRender(); say('남은 배관 선이 없습니다.'); return; } wRender(); say('그 선을 빼고 배관을 다시 찾았습니다.'); return; }
+      const gone = r.steps.splice(q.si);
+      gone.forEach(g => { if (g.id) for (let k = R.runs.length - 1; k >= 0; k--) if (R.runs[k].start && R.runs[k].start.tee === g.id) wDropRun(k); });
+      const ri = R.runs.indexOf(r);
+      if (!r.steps.length) { wDropRun(ri); W.q = { ri, si: 0, phase: null }; }
+      else { const last = r.steps[r.steps.length - 1]; if (last.t === 'elbow') { last.t = 'end'; last.okEnd = false; } W.q = { ri, si: Math.max(0, r.steps.length - 1), phase: null }; }
+      wFirstPhase(); wRender(); say('그 구간을 뺐습니다. 배관은 앞 지점에서 끝납니다.'); return;
+    }
     wSnap();
     const [k, v] = a.split(':');
     if (k === 'size') { R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; wAdvance(); }
@@ -831,7 +870,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
   wcss.textContent = `.wz{max-width:1150px;margin:0 auto}.wzhd{display:flex;align-items:center;gap:10px;margin-bottom:8px}.wzbar{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}.wzbar i{display:block;height:100%;background:#0f766e}
 .wzmain{position:relative;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;background:#fff}#wzcv{display:block;width:100%;height:auto}#wzmini{position:absolute;right:8px;bottom:8px;width:200px;border:1px solid #94a3b8;background:#fff;opacity:.92}
 .wzq{font-size:20px;margin:14px 0 10px}.wzt{display:inline-block;background:#e0f2fe;color:#075985;border-radius:4px;padding:1px 8px;font-size:14px;vertical-align:middle}
-.wzb{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.wzb button{font-size:17px;padding:10px 16px;border-radius:8px;min-width:90px}.wzb button.on{outline:3px solid #0f766e}.wz button.big{font-size:18px;padding:12px 22px}.wz button.ghost{background:#f8fafc;color:#475569}
+.wzb{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.wzb button{font-size:17px;padding:10px 16px;border-radius:8px;min-width:90px}.wzb button.on{outline:3px solid #0f766e}.wz button.big{font-size:18px;padding:12px 22px}.wz button.ghost{background:#f8fafc;color:#475569}.wzno{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px}.wzno span{font-size:14px;color:#9a3412}.wzno button{font-size:15px;padding:7px 12px}.wz button.warn{background:#fff;color:#b91c1c;border-color:#fca5a5}
 .wzs{gap:12px;flex-wrap:wrap;margin:8px 0}.wzs input{font-size:16px;padding:6px}.wzft{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:10px}
 @media(max-width:700px){#wzmini{display:none}.wzq{font-size:17px}}`;
   document.head.appendChild(wcss);

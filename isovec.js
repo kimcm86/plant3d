@@ -119,16 +119,35 @@
       const xi = isect(l, m);
       if (!xi || xi.sl < g0 - 1 || xi.sl > g1 + 1 || xi.sm < m.s0 - 1.5 || xi.sm > m.s1 + 1.5) return false;
       const endsHere = Math.min(Math.abs(xi.sm - m.s0), Math.abs(xi.sm - m.s1)) < 1.5; // 틈 자리에서 끝나는 선 = 꺾임·티 배관
-      const welded = dots.some(d => { const s = d[0] * m.u[0] + d[1] * m.u[1], o = d[0] * m.n[0] + d[1] * m.n[1]; return Math.abs(o - m.off) < 1.2 && s > m.s0 - 3 && s < m.s1 + 3; });
-      return endsHere || welded;
+      return endsHere;
     });
     const gk = {};
     cand.forEach(l => { const k = l.ax + '|' + Math.round(l.off / 0.5); (gk[k] = gk[k] || []).push(l); });
+    // 틈 안에 기호(밸브 등) 획이 있는가: 배관을 가로지르는 짧은 선 2개 이상
+    const symS = segs.filter(q => !q.isFill).map(([a, b]) => ({ m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], len: dist(a, b), ang: deg(b[0] - a[0], b[1] - a[1]) })).filter(q => q.len > 1.5 && q.len < 16);
+    const symGap = (l, g0, g1) => symS.filter(q => { const s = q.m[0] * l.u[0] + q.m[1] * l.u[1], o = q.m[0] * l.n[0] + q.m[1] * l.n[1]; return s > g0 - 1 && s < g1 + 1 && Math.abs(o - l.off) < 7 && angDiff(q.ang, LINES.find(x => x[0] === l.ax)[1]) > 20; }).map(q => q.m[0] * l.u[0] + q.m[1] * l.u[1]).sort((x, y) => x - y).some((v, i, A) => i > 0 && v - A[0] > 1.5); // 위치가 다른 획 2개 이상(플랜지 면·밸브) — 한 줄로 지나가는 배관과 구별
+    // 틈을 다른 선이 지나가면(앞뒤로 엇갈려 그린 곳) 같은 배관으로 이음
+    const passGap = (l, g0, g1) => g1 - g0 < 10 && segs.some(([a, b]) => { if (dist(a, b) < 6) return false; const ang = deg(b[0] - a[0], b[1] - a[1]); if (angDiff(ang, LINES.find(x => x[0] === l.ax)[1]) < 20) return false;
+      const oa = a[0] * l.n[0] + a[1] * l.n[1] - l.off, ob = b[0] * l.n[0] + b[1] * l.n[1] - l.off; if (oa * ob >= 0 || Math.min(Math.abs(oa), Math.abs(ob)) < 2) return false;
+      const t = oa / (oa - ob), X = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], sx = X[0] * l.u[0] + X[1] * l.u[1]; return sx > g0 && sx < g1; });
+    const fillM = segs.filter(q => q.isFill).map(([a, b]) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+    const dotIn = (l, g0, g1) => g1 - g0 < 8 && dots.concat(fillM).some(d => { const s = d[0] * l.u[0] + d[1] * l.u[1], o = d[0] * l.n[0] + d[1] * l.n[1]; return Math.abs(o - l.off) < 1.5 && s > g0 - 1 && s < g1 + 1; });
     Object.values(gk).forEach(arr => {
       arr.sort((p, q) => p.s0 - q.s0);
+      // 1) 틈 종류 판정: 용접(≤2.5)·기호(밸브)는 잇고, 빈 틈은 점선 → 잇지 않음
+      const link = [];
+      for (let i = 0; i + 1 < arr.length; i++) {
+        const g0 = arr[i].s1, g1 = arr[i + 1].s0, g = g1 - g0;
+        link.push(g >= 22 ? 'no' : g <= 2.5 ? 'weld' : symGap(arr[i], g0, g1) ? 'sym' : dotIn(arr[i], g0, g1) ? 'weld' : crossGap(arr[i], g0, g1) ? 'no' : passGap(arr[i], g0, g1) ? 'pass' : 'empty');
+      }
+      // 2) 빈 틈으로 3조각 이상 이어지는 줄 = 점선/일점쇄선(기존 배관·중심선) → 배관 후보에서 뺌
+      let i0 = 0;
+      for (let i = 0; i <= link.length; i++) if (i === link.length || link[i] !== 'empty') { if (i - i0 + 1 >= 3) for (let k = i0; k <= i; k++) arr[k].dashed = true; i0 = i + 1; }
       let cur = null;
-      arr.forEach(l => {
-        if (cur && l.s0 - cur.s1 < 22 && !crossGap(cur, cur.s1, l.s0)) { cur.gaps.push([cur.s1, l.s0]); cur.s1 = Math.max(cur.s1, l.s1); }
+      arr.forEach((l, i) => {
+        if (l.dashed) { cur && bridged.push(cur); cur = null; return; }
+        const lk = i > 0 ? link[i - 1] : 'no';
+        if (cur && (lk === 'weld' || lk === 'sym' || lk === 'pass')) { if (lk === 'sym') cur.gaps.push([cur.s1, l.s0]); cur.s1 = Math.max(cur.s1, l.s1); }
         else { cur && bridged.push(cur); cur = Object.assign({}, l, { gaps: [] }); }
       });
       cur && bridged.push(cur);
@@ -195,8 +214,8 @@
   }
 
   /* 3) 배관 선 → 경로표 초안 (거리 d는 비움) */
-  function toRoute(A, mmpt) {
-    mmpt = mmpt || 50;
+  function toRoute(A, mmpt, opt) {
+    mmpt = mmpt || 50; opt = opt || {};
     const { pipes, P } = A;
     if (!pipes.length) return null;
     const pt = (l, s) => P(l, s);
@@ -237,6 +256,11 @@
       const drop = n.edges.filter(e => main ? e.l.ax !== main : false);
       drop.forEach(e => { [e.n0, e.n1].forEach(x => { x.edges = x.edges.filter(y => y !== e); }); });
     });
+    // 사용자가 "배관 아님"이라고 한 구간 빼기
+    const dSeg = (p, a, b) => { const v = [b[0] - a[0], b[1] - a[1]], L2 = v[0] * v[0] + v[1] * v[1] || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * v[0] + (p[1] - a[1]) * v[1]) / L2)); return dist(p, [a[0] + v[0] * t, a[1] + v[1] * t]); };
+    (opt.excl || []).forEach(([a, b]) => nodes.forEach(n => n.edges.slice().forEach(e => {
+      if (dSeg(e.n0.p, a, b) < 3 && dSeg(e.n1.p, a, b) < 3) [e.n0, e.n1].forEach(x => { x.edges = x.edges.filter(y => y !== e); });
+    })));
     // 꺾임 너머로 튀어나온 짧은 끝(치수 보조선이 이어진 것) 잘라내기
     for (let it = 0; it < 3; it++) nodes.slice().forEach(n => {
       if (n.edges.length !== 1) return;
@@ -247,7 +271,9 @@
     const dirOf = (from, to) => { const v = [to[0] - from[0], to[1] - from[1]], L = Math.hypot(v[0], v[1]) || 1; let best = null, bv = -2; Object.entries(AX).forEach(([k, a]) => { const d = (v[0] * a[0] + v[1] * a[1]) / L; if (d > bv) { bv = d; best = k; } }); return best; };
     // 시작점: 차수 1 노드 중 가장 오른쪽 아래(관례상 아무 끝이나 가능)
     const ends = nodes.filter(n => n.edges.length === 1);
-    const start = (ends.length ? ends : nodes).slice().sort((a, b) => (b.p[1] + b.p[0] * 0.2) - (a.p[1] + a.p[0] * 0.2))[0];
+    if (!nodes.length) return null;
+    const cands = (ends.length ? ends : nodes).slice().sort((a, b) => (b.p[1] + b.p[0] * 0.2) - (a.p[1] + a.p[0] * 0.2));
+    const startIdx = ((opt.startAt || 0) % cands.length + cands.length) % cands.length, start = cands[startIdx];
     const used = new Set(), runs = []; let tid = 0;
     const queue = [{ node: start, from: null, start: 'origin', id: 'R1' }];
     while (queue.length) {
@@ -281,18 +307,19 @@
       runs.push(run);
     }
     // 각 run 의 tee 분기 시작은 "only" 구간부터 — 큐 처리에서 첫 edge 선택 보정
-    return { line_no: '', title: '', nps: 4, cls: 150, notes: ['선 자동 추출 결과입니다. 거리는 도면상 길이로 어림한 값(노란 줄)이니 도면 치수로 바꿔 입력하세요. 꺾임·플랜지·밸브 위치와 종류, 빠진 티·레듀서도 확인해 주세요.'], runs: runs.filter(r => r.steps.length), auto: true };
+    return { line_no: '', title: '', nps: 4, cls: 150, notes: ['선 자동 추출 결과입니다. 거리는 도면상 길이로 어림한 값(노란 줄)이니 도면 치수로 바꿔 입력하세요. 꺾임·플랜지·밸브 위치와 종류, 빠진 티·레듀서도 확인해 주세요.'], runs: runs.filter(r => r.steps.length), auto: true, nStarts: cands.length, startIdx };
   }
 
   async function extract(pdfjs, data) {
     const doc = await pdfjs.getDocument({ data }).promise, page = await doc.getPage(1);
     const pg = await readPage(pdfjs, page);
     const A = analyze(pg);
-    const route = toRoute(A, 50 * 842 / pg.W);
+    const mm = 50 * 842 / pg.W, route = toRoute(A, mm);
     const snaps = []; A.pipes.forEach(l => { snaps.push(l.a, l.b); (l.feats || []).forEach(f => snaps.push(A.P(l, f.s))); });
-    return { snaps, page: { W: pg.W, H: pg.H }, stats: { segs: pg.segs.length, fills: pg.fills.length, dots: A.dots.length, arrows: A.arrows.length, pipes: A.pipes.length }, pipes: A.pipes.map(l => ({ a: l.a, b: l.b, ax: l.ax, feats: (l.feats || []).map(f => ({ t: f.t, p: A.P(l, f.s) })) })), dots: A.dots, route };
+    return { snaps, page: { W: pg.W, H: pg.H }, stats: { segs: pg.segs.length, fills: pg.fills.length, dots: A.dots.length, arrows: A.arrows.length, pipes: A.pipes.length }, pipes: A.pipes.map(l => ({ a: l.a, b: l.b, ax: l.ax, feats: (l.feats || []).map(f => ({ t: f.t, p: A.P(l, f.s) })) })), dots: A.dots, route, _A: A, _mm: mm };
   }
 
-  const API = { extract, readPage, analyze, toRoute, AX };
+  const reroute = (res, opt) => toRoute(res._A, res._mm, opt);
+  const API = { extract, readPage, analyze, toRoute, reroute, AX };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.P3DVEC = API;
 })(typeof window !== 'undefined' ? window : globalThis);
