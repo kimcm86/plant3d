@@ -337,7 +337,9 @@
     const ends = nodes.filter(n => n.edges.length === 1);
     if (!nodes.length) return null;
     const cands = (ends.length ? ends : nodes).slice().sort((a, b) => (b.p[1] + b.p[0] * 0.2) - (a.p[1] + a.p[0] * 0.2));
-    const startIdx = ((opt.startAt || 0) % cands.length + cands.length) % cands.length, start = cands[startIdx];
+    let startIdx = ((opt.startAt || 0) % cands.length + cands.length) % cands.length;
+    if (opt.startNear) { let bd = 1e9; cands.forEach((n, i) => { const dd = dist(n.p, opt.startNear); if (dd < bd) { bd = dd; startIdx = i; } }); } // 사용자가 도면에서 고른 시작점
+    const start = cands[startIdx];
     const used = new Set(), runs = []; let tid = 0;
     const queue = [{ node: start, from: null, start: 'origin', id: 'R1' }];
     while (queue.length) {
@@ -382,7 +384,7 @@
       runs.push(run);
     }
     // 각 run 의 tee 분기 시작은 "only" 구간부터 — 큐 처리에서 첫 edge 선택 보정
-    return { line_no: '', title: '', nps: 4, cls: 150, notes: ['선 자동 추출 결과입니다. 거리는 도면상 길이로 어림한 값(노란 줄)이니 도면 치수로 바꿔 입력하세요. 꺾임·플랜지·밸브 위치와 종류, 빠진 티·레듀서도 확인해 주세요.'], runs: runs.filter(r => r.steps.length), auto: true, nStarts: cands.length, startIdx };
+    return { line_no: '', title: '', nps: 4, cls: 150, notes: ['선 자동 추출 결과입니다. 거리는 도면상 길이로 어림한 값(노란 줄)이니 도면 치수로 바꿔 입력하세요. 꺾임·플랜지·밸브 위치와 종류, 빠진 티·레듀서도 확인해 주세요.'], runs: runs.filter(r => r.steps.length), auto: true, nStarts: cands.length, startIdx, cands: cands.map(n => n.p.slice()) };
   }
 
   async function extract(pdfjs, data) {

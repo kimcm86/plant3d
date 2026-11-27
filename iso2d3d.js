@@ -719,10 +719,10 @@ RULES
     W.q.phase = 'done'; return false;
   }
   function wAdvance() { if (W.q.phase === 'size') W.q = { ri: 0, si: 0, phase: null }; else W.q.phase = null; wFirstPhase(); }
-  const wSnap = () => W.hist.push(JSON.stringify({ R: W.R, q: W.q, excl: W.excl, startAt: W.startAt }));
+  const wSnap = () => W.hist.push(JSON.stringify({ R: W.R, q: W.q, excl: W.excl, startAt: W.startAt, startNear: W.startNear }));
   // 배관 선을 다시 찾기 (빼기로 한 구간·시작점 반영). 답한 크기·라인번호는 유지
   function wReroute() {
-    const old = W.R, nr = window.P3DVEC.reroute(W.ext, { excl: W.excl, startAt: W.startAt });
+    const old = W.R, nr = window.P3DVEC.reroute(W.ext, { excl: W.excl, startAt: W.startAt, startNear: W.startNear });
     if (!nr || !nr.runs.length) return false;
     nr.runs.forEach(r => r.steps.forEach(s => { if (s.t === 'valve') delete s.vt; }));
     ['nps', 'line_no', 'cls'].forEach(k => { if (old[k] != null && old[k] !== '') nr[k] = old[k]; });
@@ -759,10 +759,10 @@ RULES
     $('iso3').hidden = true; $('isop').hidden = true;
     const b = document.querySelector('.wz [data-att=table]'); if (b) b.onclick = e => { e.stopPropagation(); table(f.id); };
   }
-  function wView(pts, mode) {
+  function wView(pts, mode, marks, drag) {
     // 질문 대상 부분을 확대해서 그린다 (표시는 옅게)
     const cv = $('wzcv'), mini = $('wzmini'); if (!cv) return;
-    const K = W.k, xs = pts.map(p => p[0] * K), ys = pts.map(p => p[1] * K);
+    const K = W.k, all = pts.concat(marks || []), xs = all.map(p => p[0] * K), ys = all.map(p => p[1] * K);
     let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
     const m = Math.max(70 * K, (Math.max(x1 - x0, y1 - y0)) * 0.45);
     x0 -= m; x1 += m; y0 -= m; y1 += m;
@@ -771,11 +771,14 @@ RULES
     const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, VW, VH);
     g.drawImage(W.big, x0, y0, w, h, 0, 0, VW, VH);
     const sc = VW / w, T2 = p => [(p[0] * K - x0) * sc, (p[1] * K - y0) * sc];
+    W.vt = { x0, y0, sc, K, T2 };
+    (marks || []).forEach(p0 => { const p = T2(p0); g.fillStyle = 'rgba(22,163,74,.18)'; g.strokeStyle = 'rgba(22,163,74,.85)'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 11, 0, 7); g.fill(); g.stroke(); });
     if (mode === 'seg' && pts.length >= 2) {
       const a = T2(pts[0]), b = T2(pts[1]);
       g.strokeStyle = 'rgba(37,99,235,.22)'; g.lineWidth = 16; g.lineCap = 'round'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
       [a, b].forEach(p => { g.strokeStyle = 'rgba(220,38,38,.9)'; g.lineWidth = 2.5; g.beginPath(); g.arc(p[0], p[1], 13, 0, 7); g.stroke(); });
     } else pts.forEach(p0 => { const p = T2(p0); g.strokeStyle = 'rgba(220,38,38,.9)'; g.lineWidth = 3; g.beginPath(); g.arc(p[0], p[1], 26, 0, 7); g.stroke(); });
+    if (drag) { g.strokeStyle = 'rgba(220,38,38,.95)'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(drag[0], drag[1], 15, 0, 7); g.stroke(); g.setLineDash([]); }
     if (mini) { const mg = mini.getContext('2d'), ms = mini.width / W.big.width; mini.height = Math.round(W.big.height * ms); mg.drawImage(W.big, 0, 0, mini.width, mini.height); mg.strokeStyle = '#dc2626'; mg.lineWidth = 2; mg.strokeRect(x0 * ms, y0 * ms, w * ms, h * ms); }
   }
   function wRender() {
@@ -786,7 +789,7 @@ RULES
     const branchNote = r && r.start && r.start.tee ? '<span class="wzt">갈라진 배관</span> ' : '';
     if (q.phase === 'size') {
       { const r0 = R.runs[0], s0 = r0.steps[0]; pts = s0 && s0._p ? [r0._p0, s0._p] : [r0._p0]; if (pts.length > 1) mode = 'seg'; }
-      title = '빨간 원에서 배관이 시작합니다 (파란 띠 = 첫 구간). 맞으면 배관 크기를 고르세요.';
+      title = '빨간 원에서 배관이 시작합니다 (파란 띠 = 첫 구간). 맞으면 배관 크기를 고르세요.<br><span class="wzt">틀리면 도면에서 초록 원(배관 끝) 중 진짜 시작점을 누르거나, 빨간 원을 끌어다 놓으세요</span>';
       body = `<div class="wzb">${QS.map(v => btn('size:' + v, nf(v), (+R.nps === v ? 'on' : ''))).join('')}</div>
         <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label></div>
         <div class="wzno"><span>시작점이 틀렸나요?</span>${btn('notpipe', '✕ 파란 띠는 배관이 아님 (점선·치수선 등)', 'warn')}${(R.nStarts || 1) > 1 ? btn('nextstart', '↻ 다른 끝에서 시작 (' + ((R.startIdx || 0) + 1) + ' / ' + R.nStarts + ')', 'ghost') : ''}</div>`;
@@ -843,18 +846,40 @@ RULES
  <div class="row wzft"><button data-wz="back"${W.hist.length ? '' : ' disabled'}>← 이전</button><span style="flex:1"></span><button data-att="back">그만두기</button><button data-wz="adv" class="ghost">고급 편집</button></div>
  <div id="wzmsg" class="mut"></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
-    wView(pts.filter(Boolean), mode);
+    const marks = q.phase === 'size' ? (R.cands || []).filter(c => dist2(c, R.runs[0]._p0) > 1) : null;
+    wView(pts.filter(Boolean), mode, marks);
+    if (q.phase === 'size' && R.cands && R.cands.length > 1) wPick(pts.filter(Boolean), mode, marks);
     const d = $('wzd'); if (d) { d.focus(); d.onkeydown = e => { if (e.key === 'Enter') wAnswer('len'); }; }
+  }
+  const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  // 시작점 고르기: 초록 원(배관 끝)을 누르거나 빨간 원을 끌어다 놓으면 그 끝에서 다시 시작
+  function wPick(pts, mode, marks) {
+    const cv = $('wzcv'); if (!cv) return;
+    cv.style.cursor = 'pointer'; cv.style.touchAction = 'none';
+    const at = e => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * cv.width / b.width, (e.clientY - b.top) * cv.height / b.height]; };
+    const near = c => { let best = null, bd = 1e9; W.R.cands.forEach(p => { const q = W.vt.T2(p), dd = Math.hypot(q[0] - c[0], q[1] - c[1]); if (dd < bd) { bd = dd; best = p; } }); return bd < 45 ? best : null; };
+    let drag = false;
+    cv.onpointerdown = e => { const c = at(e), s0 = W.vt.T2(W.R.runs[0]._p0); drag = Math.hypot(s0[0] - c[0], s0[1] - c[1]) < 30; if (drag) cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove = e => { if (drag) wView(pts, mode, marks, at(e)); else cv.style.cursor = near(at(e)) ? 'pointer' : 'default'; };
+    cv.onpointerup = e => {
+      const p = near(at(e)); const wasDrag = drag; drag = false;
+      const m = $('wzmsg');
+      if (!p) { if (wasDrag) wView(pts, mode, marks); if (m) m.textContent = '초록 원(배관 끝) 가까이에 놓아 주세요.'; return; }
+      if (dist2(p, W.R.runs[0]._p0) < 1) { if (wasDrag) wView(pts, mode, marks); return; }
+      wSnap(); W.startNear = p.slice();
+      if (!wReroute()) { const h = JSON.parse(W.hist.pop()); W.R = h.R; W.q = h.q; W.startNear = h.startNear; wRender(); return; }
+      wRender(); const m2 = $('wzmsg'); if (m2) m2.textContent = '시작점을 바꿨습니다. 맞으면 배관 크기를 고르세요.';
+    };
   }
   function wAnswer(a) {
     const R = W.R, q = W.q, r = R.runs[q.ri], s = r && r.steps[q.si];
-    if (a === 'back') { const h = W.hist.pop(); if (h) { const o = JSON.parse(h); W.R = o.R; W.q = o.q; if (o.excl) W.excl = o.excl; if (o.startAt != null) W.startAt = o.startAt; } wRender(); return; }
+    if (a === 'back') { const h = W.hist.pop(); if (h) { const o = JSON.parse(h); W.R = o.R; W.q = o.q; if (o.excl) W.excl = o.excl; if (o.startAt != null) W.startAt = o.startAt; W.startNear = o.startNear; } wRender(); return; }
     if (a === 'adv') { const f = W.f; f.route = W.R; P.fPut(f).then(() => table(W.fid)); return; }
     if (a === 'build') { wBuild(); return; }
     const say = t => { const m = $('wzmsg'); if (m) m.textContent = t; };
     if (a === 'notpipe' || a === 'nextstart') {
       wSnap();
-      if (a === 'notpipe') { const r0 = R.runs[0], s0 = r0.steps[0]; W.excl.push([r0._p0, (s0 && s0._p) || r0._p0]); W.startAt = 0; } else W.startAt++;
+      W.startNear = null; if (a === 'notpipe') { const r0 = R.runs[0], s0 = r0.steps[0]; W.excl.push([r0._p0, (s0 && s0._p) || r0._p0]); W.startAt = 0; } else W.startAt = (R.startIdx || 0) + 1;
       if (!wReroute()) { const h = JSON.parse(W.hist.pop()); W.R = h.R; W.q = h.q; W.excl = h.excl; W.startAt = h.startAt; wRender(); say('남은 배관 선이 없습니다. "고급 편집"에서 직접 그려 주세요.'); return; }
       wRender(); say(a === 'notpipe' ? '그 선을 빼고 배관을 다시 찾았습니다.' : '다른 끝에서 시작합니다.'); return;
     }
@@ -943,5 +968,5 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 @media(max-width:900px){.tbw{grid-template-columns:1fr}.tbimg{position:static}}`;
   document.head.appendChild(css);
 
-  window.P3DX = { wizard, convert, table, settings, manual, buildRoute, SYS, _aiRead: aiRead, _tiles: tiles };
+  window.P3DX = { _wz: () => W, wizard, convert, table, settings, manual, buildRoute, SYS, _aiRead: aiRead, _tiles: tiles };
 })();
