@@ -343,7 +343,13 @@
     while (queue.length) {
       const q = queue.shift();
       let node = q.node, prev = q.from, dir = null; const steps = []; const run = { id: q.id, start: q.start, steps, nps: '', _p0: q.node.p.slice() };
-      let last = q.node.p; const put = (st, p) => { st.d = Math.max(10, Math.round(dist(last, p) * mmpt / 10) * 10); st._p = p.slice(); st.est = true; last = p; steps.push(st); };
+      let last = q.node.p; const put = (st, p) => {
+        st.d = Math.max(10, Math.round(dist(last, p) * mmpt / 10) * 10); st._p = p.slice(); st.est = true;
+        // 이 구간 위 용접점 위치 (0=앞 지점, 1=이 지점) — 엘보·플랜지가 바로 붙은 구간(배관 없음) 판정용
+        const L = dist(last, p) || 1, v = [(p[0] - last[0]) / L, (p[1] - last[1]) / L];
+        st._wd = (A.dots || []).map(d => { const t = ((d[0] - last[0]) * v[0] + (d[1] - last[1]) * v[1]) / L, o = Math.abs((d[0] - last[0]) * v[1] - (d[1] - last[1]) * v[0]); return o < 1.5 && t > -0.3 && t < 1.3 ? Math.round(t * 100) / 100 : null; }).filter(t => t != null).sort((x, y) => x - y);
+        st._pt = Math.round(L * 10) / 10;
+        last = p; steps.push(st); };
       let e = node.edges.find(x => !used.has(x) && (!prev || x !== prev));
       while (e) {
         used.add(e);

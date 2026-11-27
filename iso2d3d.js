@@ -683,7 +683,32 @@ RULES
     return n;
   }
   function wRemain() { let n = W.q.phase === 'size' ? 1 : 0; W.R.runs.forEach(r => r.steps.forEach(s => { n += phasesOf(s).length; })); return n; }
+  // 엘보·티가 플랜지나 용접점에 바로 붙은 짧은 구간(사이에 배관 용접점 없음)은
+  // 배관이 없는 '부품 맞붙임' 구간 → ASME B16.9(엘보·티 중심~끝) + B16.5(플랜지) 치수로 길이를 자동으로 넣는다
+  function fitHalf(kind, n) {
+    const R = W.R, cls = +R.cls || 150;
+    if (kind === 'elbow') return P.eg({ type: 'elbow', kind: 'lr90', nps: n, axis: '+X', turn: '+Y', pos: [0, 0, 0] }).R;
+    if (kind === 'tee' || kind === 'tee_in') return P.dflen({ type: 'tee', nps: n }) / 2;
+    if (kind === 'flange') return P.HGx(cls, 'RF', n) + P.dflen({ type: 'flange', nps: n, kind: 'wn', cls });
+    if (kind === 'weld') return 0;
+    return null;
+  }
+  function autoLen() {
+    const R = W.R; if (!R.nps) return;
+    R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
+      if (s.okLen || !s._wd || !(s._pt < 15)) return;
+      if (s._wd.some(t => t > 0.12 && t < 0.88)) return; // 사이에 용접점이 있으면 배관이 있음 → 물어봄
+      if (['flange', 'valve'].includes(s.t) && !s.okType) return;
+      const n = npsAt(ri, si);
+      const a = si === 0 ? (r.start && r.start.tee ? 'tee' : (s._wd.some(t => t <= 0.12) ? 'weld' : null)) : r.steps[si - 1].t;
+      const b = s.t === 'end' ? (s._wd.some(t => t >= 0.88) ? 'weld' : null) : s.t;
+      if (![a, b].some(k => k === 'elbow' || k === 'tee' || k === 'tee_in')) return;
+      const ha = fitHalf(a, n), hb = fitHalf(b, n); if (ha == null || hb == null) return;
+      s.d = Math.round((ha + hb) * 10) / 10; s.okLen = true; s.auto = 'fit'; delete s.est; delete s.conf;
+    }));
+  }
   function wFirstPhase() {
+    autoLen();
     while (W.q.ri < W.R.runs.length) {
       const r = W.R.runs[W.q.ri];
       while (W.q.si < r.steps.length) { const ph = phasesOf(r.steps[W.q.si]); if (ph.length) { W.q.phase = ph[0]; return true; } W.q.si++; }
@@ -768,7 +793,8 @@ RULES
     } else if (q.phase === 'done') {
       const n = R.runs.reduce((a, x) => a + x.steps.length, 0);
       title = '질문이 끝났습니다.';
-      body = `<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
+      const na = R.runs.reduce((a, x) => a + x.steps.filter(y => y.auto === 'fit').length, 0);
+      body = `${na ? '<p>엘보·티가 플랜지나 용접점에 바로 붙은 구간 <b>' + na + '곳</b>은 길이를 묻지 않고 ASME B16.9/B16.5 치수로 넣었습니다.</p>' : ''}<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
       pts = R.runs.flatMap(x => [x._p0].concat(x.steps.map(y => y._p))).filter(Boolean);
     } else if (s) {
       const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
