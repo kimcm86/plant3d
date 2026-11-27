@@ -767,8 +767,9 @@ RULES
       const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
       if (q.phase === 'type') {
         pts = [s._p];
-        title = branchNote + '빨간 원 안의 표시는 무엇인가요?';
-        body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브')}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브')}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
+        title = branchNote + '빨간 원 안의 표시는 무엇인가요?' + (s.vguess ? ' <span class="wzt">밸브 모양으로 보임</span>' : '');
+        const on = v => (s.vguess === v ? 'on' : '');
+        body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브' + (s.vguess === 'gate' ? ' (플랜지형)' : ''), on('gate'))}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브')}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
       } else if (q.phase === 'branch') {
         pts = [s._p];
         title = branchNote + '여기서 배관이 갈라집니다. 갈라지는 쪽 배관 크기는?';
@@ -782,8 +783,10 @@ RULES
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
-        title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?';
-        body = `<div class="wzb">${btn('end:open', '기존 배관에 연결 / 용접')}${btn('end:cap', '캡')}${btn('end:blind', '블라인드 플랜지')}${btn('end:flange', '플랜지 (열림)')}${btn('end:pump', '펌프')}${btn('end:vessel', '베셀·탑')}${btn('end:drum', '드럼')}${btn('end:hx', '열교환기')}</div><div class="row wzs"><label>장치 번호 (장치일 때) <input id="wztag" placeholder="예: P-101A"></label></div>`;
+        const eg = { cap: '캡 모양(ㄷ)이 보입니다', flange: '밸브 바로 끝 — 플랜지로 계기·장치에 연결될 가능성' }[s.guess];
+        title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?' + (eg ? ' <span class="wzt">' + eg + '</span>' : '');
+        const eo = v => (s.guess === v ? 'on' : '');
+        body = `<div class="wzb">${btn('end:open', '기존 배관에 연결 / 용접')}${btn('end:cap', '캡', eo('cap'))}${btn('end:blind', '블라인드 플랜지')}${btn('end:flange', '플랜지 (열림)', eo('flange'))}${btn('end:pump', '펌프')}${btn('end:vessel', '베셀·탑')}${btn('end:drum', '드럼')}${btn('end:hx', '열교환기')}</div><div class="row wzs"><label>장치 번호 (장치일 때) <input id="wztag" placeholder="예: P-101A"></label></div>`;
       }
     }
     const pct = Math.round(idx / total * 100);

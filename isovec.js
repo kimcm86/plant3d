@@ -218,7 +218,47 @@
       (l.gaps || []).forEach(([g0, g1]) => { const s = (g0 + g1) / 2; if (!l.feats.some(f => Math.abs(f.s - s) < 10)) l.feats.push({ t: 'valve', s, guess: true }); });
       l.feats.sort((p, q) => p.s - q.s);
     });
-    return { pipes, dots, arrows, merged, P };
+    // 아이소 밸브(나비꼴 ⋈): 아이소 축(30/90/150°)이 아닌 빗선 2개 이상이 배관 축을 가로지르는 곳
+    const isoAng = a => [30, 90, 150].some(t => angDiff(a, t) < 4);
+    const slant = segs.filter(q => !q.isFill).map(([a, b]) => ({ a, b, len: dist(a, b), ang: deg(b[0] - a[0], b[1] - a[1]) })).filter(q => q.len >= 7 && q.len < 25 && !isoAng(q.ang)); // 용접 끝 작은 삼각형(7pt 미만)은 제외
+    const valves = [], vc = [];
+    pipes.forEach(l => {
+      const xs = [];
+      slant.forEach(q => {
+        const oa = q.a[0] * l.n[0] + q.a[1] * l.n[1] - l.off, ob = q.b[0] * l.n[0] + q.b[1] * l.n[1] - l.off;
+        if (Math.max(Math.abs(oa), Math.abs(ob)) > 12 || !(oa * ob < 0 || Math.min(Math.abs(oa), Math.abs(ob)) < 1.2)) return;
+        const t = Math.abs(oa - ob) < 1e-6 ? 0 : Math.max(0, Math.min(1, oa / (oa - ob))), X = [q.a[0] + (q.b[0] - q.a[0]) * t, q.a[1] + (q.b[1] - q.a[1]) * t];
+        const sx = X[0] * l.u[0] + X[1] * l.u[1]; if (sx > l.s0 - 2 && sx < l.s1 + 2) xs.push(sx);
+      });
+      xs.sort((x, y) => x - y);
+      const g = []; xs.forEach(v => { const c = g[g.length - 1]; if (c && v - c.e < 6) { c.e = v; c.v.push(v); } else g.push({ b: v, e: v, v: [v] }); });
+      g.forEach(c => { if (c.v.length >= 2) vc.push({ p: P(l, c.v.reduce((a, v) => a + v, 0) / c.v.length), n: c.v.length, L: l.len }); });
+    });
+    // 같은 밸브 중심을 지나는 선이 여럿이면(배관 + 핸들 축) 가장 긴 선이 배관, 짧은 선(30pt 미만)은 핸들 축으로 보고 뺀다
+    const onPipe = (m, p) => { const sp = onLine(m, p, 1.5); return sp != null && sp > m.s0 - 2 && sp < m.s1 + 2 ? sp : null; };
+    vc.sort((x, y) => y.n - x.n || y.L - x.L).forEach(c => { if (valves.some(v => dist(v, c.p) < 12)) return; valves.push(c.p); });
+    const drop = new Set();
+    valves.forEach(p => {
+      const own = pipes.filter(m => onPipe(m, p) != null).sort((x, y) => y.len - x.len);
+      if (!own.length) return; const l = own[0], sv = Math.min(l.s1 - 0.6, Math.max(l.s0 + 0.6, onPipe(l, p)));
+      l.feats = (l.feats || []).filter(f => Math.abs(f.s - sv) > 9); // 밸브 양옆 플랜지 표시는 밸브(플랜지형)에 포함
+      l.feats.push({ t: 'valve', s: sv, vt: 'gate', iso: true }); l.feats.sort((x, y) => x.s - y.s);
+      own.slice(1).forEach(m => { if (m.len < 30 && m.ax !== l.ax) drop.add(m); });
+      pipes.forEach(m => { if (m === l || m.len >= 30 || m.ax === l.ax) return; // 밸브 기호 안을 지나는 짧은 선 = 핸들 축
+        const xi = isect(l, m); if (xi && dist(xi.X, p) < 9 && xi.sm > m.s0 - 2 && xi.sm < m.s1 + 2) drop.add(m); });
+    });
+    for (let i = pipes.length - 1; i >= 0; i--) if (drop.has(pipes[i])) pipes.splice(i, 1);
+    // 캡(ㄷ 모양): 배관 끝 5pt 안에 짧은 획 3개 이상
+    const tiny = segs.filter(q => !q.isFill).filter(([a, b]) => { const n = dist(a, b); return n >= 2 && n <= 6; });
+    const caps = [];
+    pipes.forEach(l => { const la = LINES.find(x => x[0] === l.ax)[1];
+      [[l.a, -1], [l.b, 1]].forEach(([e, sg]) => {
+        const es = e[0] * l.u[0] + e[1] * l.u[1], near = tiny.filter(([a, b]) => dist(a, e) < 5 && dist(b, e) < 5).map(([a, b]) => { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return { o: m[0] * l.n[0] + m[1] * l.n[1] - l.off, s: (m[0] * l.u[0] + m[1] * l.u[1] - es) * sg, ang: deg(b[0] - a[0], b[1] - a[1]) }; });
+        const par = near.filter(q => angDiff(q.ang, la) < 5 && Math.abs(q.o) > 0.8 && Math.abs(q.o) < 3.5);
+        const sides = par.some(q => q.o > 0) && par.some(q => q.o < 0), bottom = near.some(q => angDiff(q.ang, la) > 20 && q.s > 0.3 && Math.abs(q.o) < 3);
+        if (sides && bottom) caps.push(e); // ㄷ 모양: 배관 양옆 평행선 + 끝을 막는 선
+      }); });
+    return { pipes, dots, arrows, merged, P, valves, caps };
   }
 
   /* 3) 배관 선 → 경로표 초안 (거리 d는 비움) */
@@ -296,10 +336,15 @@
         else if (d !== dir) { put({ t: 'elbow', to: d, conf: 'low' }, node.p); dir = d; }
         // 구간 안 기호(진행 방향 순서)
         const fs = e.feats.map(f => ({ f, p: pt(e.l, f.s) })).sort((a, b) => dist(node.p, a.p) - dist(node.p, b.p));
-        fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : { t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, p));
+        fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : Object.assign({ t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, f.iso ? { vguess: 'gate' } : {}), p));
         node = other;
         const rest = node.edges.filter(x => !used.has(x));
-        if (!rest.length) { put({ t: 'end', end: 'open', conf: 'low' }, node.p); break; }
+        if (!rest.length) {
+          const st = { t: 'end', end: 'open', conf: 'low' };
+          if ((A.caps || []).some(c => dist(c, node.p) < 6)) st.guess = 'cap';
+          else if ((A.valves || []).some(v => dist(v, node.p) < 14)) st.guess = 'flange'; // 밸브 바로 끝 = 플랜지로 계기·장치에 연결
+          put(st, node.p); break;
+        }
         // 직진 우선, 나머지는 분기
         const straight = rest.find(x => dirOf(node.p, (x.n0 === node ? x.n1 : x.n0).p) === dir);
         const nextE = straight || rest[0];
