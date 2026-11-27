@@ -28,7 +28,9 @@ button,select,input,textarea{font:inherit;color:var(--fg)}
 button{background:var(--in);border:1px solid var(--bd);border-radius:4px;padding:6px 8px;cursor:pointer}
 button:hover{border-color:var(--ac)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--ac)}
 #pal button{display:block;width:100%;text-align:left;margin-bottom:4px}
-#vp{flex:1;position:relative;min-width:0}
+#vp{flex:1;position:relative;min-width:0;background:radial-gradient(ellipse at 50% 35%,#ffffff 0%,#eef2f6 55%,#dde3ea 100%)}
+#vbar{position:absolute;right:14px;bottom:88px;display:flex;flex-direction:column;gap:4px;z-index:6}#vbar button{width:52px;padding:5px 0;font-size:12px;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:7px;box-shadow:0 1px 2px rgba(15,23,42,.08)}#vbar button:hover{border-color:#0f766e;color:#0f766e}#vbar button.on{background:#0f766e;color:#fff;border-color:#0f766e}#vbar .sep{height:4px}
+#undo,#redo{min-width:34px;font-size:16px;padding:2px 8px}#undo:disabled,#redo:disabled{opacity:.35}
 #cv{display:block;width:100%;height:100%;touch-action:none}
 #hint{position:absolute;left:10px;bottom:8px;color:var(--mut);font-size:12px;pointer-events:none;max-width:90%}
 #side{width:280px;padding:10px;overflow:auto;background:var(--pn);border-left:1px solid var(--bd)}
@@ -38,6 +40,7 @@ button:hover{border-color:var(--ac)}button:focus-visible,input:focus-visible,sel
 .xyz{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
 .row{display:flex;gap:6px;margin:8px 0}
 #props .phl{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}#props .ph{position:relative}#props .ph img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--bd);cursor:zoom-in;display:block}#props .ph button{position:absolute;top:2px;right:2px;padding:0 5px;font-size:12px;line-height:16px;border-radius:8px;background:rgba(255,255,255,.9)}#props .phadd{display:flex;align-items:center;justify-content:center;width:72px;height:72px;border:1.5px dashed #94a3b8;border-radius:6px;cursor:pointer;font-size:13px;color:#475569}
+#isob .lv{display:inline-block;padding:1px 7px;border-radius:9px;font-size:12px;font-weight:600}#isob .l2{background:#fee2e2;color:#b91c1c}#isob .l1{background:#fef3c7;color:#92400e}#isob .l0{background:#e2e8f0;color:#475569}
 #isob table.cl{border-collapse:collapse;width:100%;font-size:13px}#isob table.cl th,#isob table.cl td{border-bottom:1px solid #e2e8f0;padding:6px 8px;text-align:left}#isob table.cl tr[data-cl]{cursor:pointer}#isob table.cl tr[data-cl]:hover{background:#fef2f2}
 #jobs .jr{padding:8px 10px;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px;cursor:pointer;background:#fff}#jobs .jr:hover{border-color:#0f766e}#jobs .jr.cur{border:2px solid #0f766e;background:#f0fdfa;cursor:default}#jobs .jn{font-weight:600;font-size:14px}#jobs .jm{font-size:11px;color:var(--mut);margin-top:2px}#jobs .jb{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}#jobs .jb button{font-size:12px;padding:3px 8px}.jh{display:flex;align-items:center;justify-content:space-between}.jh button{font-size:12px;padding:3px 8px}#jobn{font-weight:600;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#jsave.pri,#jobm .pri{background:#0f766e;color:#fff;border-color:#0f766e}#jobm{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:50}#jobm[hidden]{display:none}#jobm .jbox{background:#fff;border-radius:12px;padding:22px 24px;width:min(520px,92vw);max-height:86vh;overflow:auto}#jobm h2{margin:0 0 12px}#jobm input{width:100%;font-size:16px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box}#jobm .big{font-size:16px;padding:10px 18px}#jobm .jl>div{padding:10px;border:1px solid #e2e8f0;border-radius:8px;margin-top:6px;cursor:pointer}#jobm .jl>div:hover{border-color:#0f766e}
 #log{max-height:200px;overflow:auto;font-size:12px;color:var(--mut)}#log div{padding:2px 0;border-bottom:1px solid var(--bd)}
@@ -51,10 +54,10 @@ button:hover{border-color:var(--ac)}button:focus-visible,input:focus-visible,sel
 button.pri{background:#0f766e;color:#fff;border-color:#0f766e}
 </style></head><body>
 <div id="app">
-<header><b>PLANT 3D</b><span id="ver"></span><button id="jobn" title="작업 목록 / 새 작업">작업: -</button><button id="jsave" class="pri">저장</button><span id="jst" class="mut"></span><span id="leg"></span><button id="bclash">간섭 체크</button><button id="bat">ISO 첨부</button><button id="bj">가스켓·조인트 목록</button><button id="bd">파일 백업</button></header>
+<header><b>PLANT 3D</b><span id="ver"></span><button id="jobn" title="작업 목록 / 새 작업">작업: -</button><button id="jsave" class="pri">저장</button><button id="undo" title="되돌리기 (Ctrl+Z)" disabled>↶</button><button id="redo" title="다시하기 (Ctrl+Y)" disabled>↷</button><button id="bchk">모델 검사</button><span id="jst" class="mut"></span><span id="leg"></span><button id="bclash">간섭 체크</button><button id="bat">ISO 첨부</button><button id="bj">가스켓·조인트 목록</button><button id="bd">파일 백업</button></header>
 <main>
 <aside id="pal"></aside>
-<div id="vp"><canvas id="cv"></canvas><div id="hint"></div></div>
+<div id="vp"><canvas id="cv"></canvas><div id="vbar"><button data-v="iso" title="기본 입체 시점">ISO</button><button data-v="top" title="위에서 (평면도)">위</button><button data-v="front" title="앞에서 (남→북)">앞</button><button data-v="right" title="오른쪽에서 (동→서)">옆</button><button data-v="fit" title="전체 보기 (F)">전체</button><div class="sep"></div><button id="vort" title="원근 / 평행 투영 (도면처럼)">원근</button><button id="vcol" title="색: 시공 상태 / 실물 재질">상태색</button></div><div id="hint"></div></div>
 <aside id="side"><div id="props"></div><h4 class="jh">작업 목록 <button id="jnew">＋ 새 작업</button></h4><div id="jobs"></div><div id="log" hidden></div></aside><div id="jobm" hidden><div class="jbox"><h2>PLANT 3D</h2><div id="jobmb"></div></div></div>
 </main>
 <div id="iso" hidden><div class="isobar"><b id="isot"></b><button id="iso3">3D로 보기</button><button id="isop">인쇄 · PDF</button><button id="isoall">전체 라인 ISO → PDF</button><button id="isoc">닫기</button></div><div id="isob"></div></div>
@@ -420,6 +423,26 @@ function cplSplit(){const o=get(sid);if(!o||o.type!=='pipe')return;const cl=6.5,
  const a=DIR[o.axis],L1=Math.round((L-cl)/2),sb=sbi(o.nps)>=0,mk=(type,ex)=>{cnt[type]=(cnt[type]||0)+1;return Object.assign({id:nid++,type,status:o.status||'미착수',note:'',tag:T[type].p+'-'+String(cnt[type]).padStart(3,'0'),nps:o.nps,axis:o.axis,ln:o.ln||'',ex:o.ex},ex)};
  o.len=L1;const p1=o.pos.map((v,i)=>Math.round((v+a.getComponent(i)*L1)*10)/10),c=mk('coupling',{pos:p1,len:cl,ce:sb?'sw':'bw',spec:''}),p2=mk('pipe',{pos:p1.map((v,i)=>Math.round((v+a.getComponent(i)*cl)*10)/10),len:L-L1-cl,spec:o.spec||''});
  objs.push(c,p2);[o,c,p2].forEach(rb);sid=c.id;ml=[];hl();rp();lg(o.tag+' 를 나눠 '+c.tag+' 커플링('+(sb?'SW':'BW')+') 넣음')}
+/* 모델 검사: 연결 이상·거의 붙은 끝·열린 끝·태그 중복·라인 번호 */
+function modelCheck(){const A=objs.filter(o=>LIN.includes(o.type)||EQ.includes(o.type)),P=[],out=[],add=(lv,msg,ids,p)=>out.push({lv,msg,ids,p});
+ A.forEach(o=>ports(o).forEach(q=>P.push({o,q})));const G=new Map(),key=(x,y,z)=>x+','+y+','+z,C=60;P.forEach((e,i)=>{const k=key(...e.q.p.map(v=>Math.floor(v/C)));(G.get(k)||G.set(k,[]).get(k)).push(i)});
+ const near=i=>{const e=P[i],c=e.q.p.map(v=>Math.floor(v/C)),r=[];for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)for(let d=-1;d<=1;d++){const L=G.get(key(c[0]+a,c[1]+b,c[2]+d));if(L)L.forEach(j=>{if(j>i&&P[j].o!==e.o)r.push(j)})}return r};
+ const linked=new Set();
+ const NB=P.map((e,i)=>near(i).map(j=>({j,d:Math.hypot(e.q.p[0]-P[j].q.p[0],e.q.p[1]-P[j].q.p[1],e.q.p[2]-P[j].q.p[2])})));NB.forEach((L,i)=>L.forEach(({j,d})=>{if(d<5){linked.add(i);linked.add(j)}}));const con=new Set(linked);
+ P.forEach((e,i)=>NB[i].forEach(({j,d})=>{const f=P[j],dot=e.q.d.dot(f.q.d),T2=e.o.tag+' ↔ '+f.o.tag,ids=[e.o.id,f.o.id];
+  if(d<5){linked.add(i);linked.add(j);
+   if(dot>-.9)add(2,'방향이 맞지 않게 붙음: '+T2,ids,e.q.p);
+   else{if(e.q.nps&&f.q.nps&&+e.q.nps!==+f.q.nps)add(2,'사이즈가 다름 ('+nf(e.q.nps)+' ↔ '+nf(f.q.nps)+'): '+T2,ids,e.q.p);
+    if(!!e.q.fl!==!!f.q.fl&&!EQ.includes(e.o.type)&&!EQ.includes(f.o.type))add(2,'플랜지와 용접 끝이 만남: '+T2,ids,e.q.p);
+    if(e.q.fl&&f.q.fl&&e.q.cls&&f.q.cls&&+e.q.cls!==+f.q.cls)add(2,'압력 등급이 다름 ('+e.q.cls+'# ↔ '+f.q.cls+'#): '+T2,ids,e.q.p);
+    if(e.q.fl&&f.q.fl&&e.q.face&&f.q.face&&e.q.face!==f.q.face)add(1,'플랜지 면 형상이 다름 ('+e.q.face+' ↔ '+f.q.face+'): '+T2,ids,e.q.p)}}
+  else if(d<50&&dot<-.98&&!con.has(i)&&!con.has(j)){const v=[f.q.p[0]-e.q.p[0],f.q.p[1]-e.q.p[1],f.q.p[2]-e.q.p[2]],al=Math.abs(v[0]*e.q.d.x+v[1]*e.q.d.y+v[2]*e.q.d.z);if(al>d*.95){linked.add(i);linked.add(j);add(1,'끝이 '+Math.round(d)+'mm 떨어져 있음 (거의 붙음): '+T2,ids,e.q.p)}}}));
+ P.forEach((e,i)=>{if(!linked.has(i)&&LIN.includes(e.o.type)&&!e.o.ex&&e.o.type!=='inst')add(0,'열린 끝: '+e.o.tag+' '+e.q.n+' ('+T[e.o.type].n+' '+nf(e.o.nps)+')',[e.o.id],e.q.p)});
+ const tc={};objs.forEach(o=>{if(o.tag)(tc[o.tag]=tc[o.tag]||[]).push(o.id)});Object.entries(tc).forEach(([t,l])=>{if(l.length>1)add(2,'태그 중복: '+t+' ('+l.length+'개)',l,null)});
+ const nol=objs.filter(o=>LIN.includes(o.type)&&!o.ex&&!o.ln);if(nol.length)add(0,'라인 번호가 없는 배관 부품 '+nol.length+'개',nol.map(o=>o.id),null);
+ return out.sort((a,b)=>b.lv-a.lv)}
+function checkUI(){const R=modelCheck(),n=[0,1,2].map(k=>R.filter(x=>x.lv===k).length),LV=['<span class="lv l0">참고</span>','<span class="lv l1">주의</span>','<span class="lv l2">오류</span>'];
+ ov('모델 검사 — 오류 '+n[2]+' · 주의 '+n[1]+' · 참고 '+n[0],R.length?`<p class='mut'>줄을 누르면 3D에서 그 부품을 보여줍니다. <b>오류</b>는 시공 전에 꼭 고쳐야 할 것, <b>주의</b>는 확인이 필요한 것, <b>참고</b>는 기존 배관 연결점처럼 정상일 수 있는 것입니다.</p><table class='cl'>${R.map(x=>`<tr data-cl='${x.ids.join(',')}'><td style='width:52px'>${LV[x.lv]}</td><td>${EH(x.msg)}</td><td class='mut'>${x.p?x.p.map(v=>Math.round(v)).join(', '):''}</td></tr>`).join('')}</table>`:`<p style='font-size:16px'>✔ 문제가 없습니다.</p>`);$('iso3').hidden=true;$('isop').hidden=true;lg('모델 검사: 오류 '+n[2]+', 주의 '+n[1]+', 참고 '+n[0])}
 function sph(o){if(o.type!=='support')return'';const hp=get(o.host);return`<div class='row'><span class='mut'>배관 위 위치</span><button data-spm='-500'>◀ 500</button><button data-spm='-100'>◀ 100</button><button data-spm='100'>100 ▶</button><button data-spm='500'>500 ▶</button></div><div class='mut'>${hp?hp.tag+' 위에 달림 · 배관 끝에서 '+Math.round(spAt(o))+' mm':'달린 배관이 없습니다'}</div>`}
 function spAt(o){const hp=get(o.host);if(!hp)return 0;const a=DIR[hp.axis]||V(1,0,0);return (o.pos[0]-hp.pos[0])*a.x+(o.pos[1]-hp.pos[1])*a.y+(o.pos[2]-hp.pos[2])*a.z}
 function spMove(d){const o=get(sid),hp=o&&get(o.host);if(!hp)return;const a=DIR[hp.axis]||V(1,0,0),t=Math.max(0,Math.min(hp.len,spAt(o)+d));o.pos=[0,1,2].map(i=>Math.round((hp.pos[i]+a.getComponent(i)*t)*10)/10);o.axis=hp.axis;o.nps=hp.nps;rb(o);hl();rp()}
@@ -458,22 +481,41 @@ const outAxis=o=>o.type==='elbow'?keyOf(eg(o).out):o.axis;
 const endOf=o=>{if(o.type==='elbow'){const e=eg(o).end;return[e.x,e.y,e.z].map(v=>Math.round(v*10)/10)}if(!LIN.includes(o.type))return o.pos.slice();const d=DIR[o.axis];return o.pos.map((v,i)=>v+d.getComponent(i)*o.len)};
 
 /* 3D 장면 */
-const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1,.1,800),cv=$('cv'),vp=$('vp');
-const rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});rd.setPixelRatio(Math.min(devicePixelRatio,2));
-sc.add(new THREE.HemisphereLight(0xffffff,0x667788,.95));
-const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(8,14,6);sc.add(dl);
+const sc=new THREE.Scene(),camP=new THREE.PerspectiveCamera(45,1,.1,800),camO=new THREE.OrthographicCamera(-1,1,1,-1,-500,1500),cv=$('cv'),vp=$('vp');let cam=camP;
+const rd=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});rd.setPixelRatio(Math.min(devicePixelRatio,2));rd.shadowMap.enabled=true;rd.shadowMap.type=THREE.PCFSoftShadowMap;
+sc.add(new THREE.HemisphereLight(0xffffff,0x5b6878,1.05));
+const dl=new THREE.DirectionalLight(0xffffff,1.0);dl.position.set(8,14,6);dl.castShadow=true;dl.shadow.mapSize.set(2048,2048);dl.shadow.bias=-.0004;dl.shadow.normalBias=.02;sc.add(dl,dl.target);const dl2=new THREE.DirectionalLight(0xdbe7ff,.35);dl2.position.set(-6,5,-8);sc.add(dl2);
+const shp=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.ShadowMaterial({opacity:.16}));shp.rotation.x=-Math.PI/2;shp.position.y=.001;shp.receiveShadow=true;sc.add(shp);
 const pm=new THREE.Group(),gk=new THREE.Group();sc.add(pm,gk);const gr=new THREE.GridHelper(60,60,0x888888,0xaaaaaa);gr.material.transparent=true;gr.material.opacity=.35;sc.add(gr);
 let yaw=.8,pit=.5,dist=14,tg=V(0,1,0);
 const cpH=document.createElement('div');cpH.style.cssText='position:absolute;right:14px;bottom:14px;width:64px;height:64px;pointer-events:none;z-index:5';cpH.innerHTML="<svg width='64' height='64' viewBox='-32 -32 64 64'><ellipse rx='28' ry='28' fill='rgba(255,255,255,.75)' stroke='#555'/><g id='cpA'><line x1='0' y1='0' x2='0' y2='-10' stroke='#d33' stroke-width='2.5'/><polygon points='0,-17 -5,-8 5,-8' fill='#d33'/></g><text id='cpT' text-anchor='middle' font-size='11' font-weight='bold' fill='#d33' font-family='sans-serif'>N</text></svg>";vp.appendChild(cpH);if(getComputedStyle(vp).position==='static')vp.style.position='relative';
 const nAr=new THREE.ArrowHelper(new THREE.Vector3(0,0,-1),new THREE.Vector3(-3,.02,2),2.5,0xdd3333,.5,.3);sc.add(nAr);
 function cpU(){const sx=Math.sin(yaw),sy=Math.cos(yaw)*Math.sin(pit),L=Math.hypot(sx,sy)||1;cpH.querySelector('#cpA').setAttribute('transform','rotate('+(Math.atan2(sx,sy)*180/Math.PI).toFixed(1)+')');const t=cpH.querySelector('#cpT');t.setAttribute('x',(sx/L*22).toFixed(1));t.setAttribute('y',(-sy/L*22+4).toFixed(1))}
-function cm(){cpU();cam.position.set(tg.x+dist*Math.cos(pit)*Math.sin(yaw),tg.y+dist*Math.sin(pit),tg.z+dist*Math.cos(pit)*Math.cos(yaw));cam.lookAt(tg)}
-function rs(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;rd.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+function cm(){camAnim();cpU();cam.position.set(tg.x+dist*Math.cos(pit)*Math.sin(yaw),tg.y+dist*Math.sin(pit),tg.z+dist*Math.cos(pit)*Math.cos(yaw));cam.lookAt(tg);
+ if(cam===camO){const h=dist*Math.tan(22.5*Math.PI/180),a=camP.aspect||1;camO.left=-h*a;camO.right=h*a;camO.top=h;camO.bottom=-h;camO.updateProjectionMatrix()}
+ const sd=Math.max(6,dist*1.1);dl.position.set(tg.x+sd*.6,tg.y+sd*1.2,tg.z+sd*.45);dl.target.position.copy(tg);const scm=dl.shadow.camera;if(Math.abs(scm.right-sd)>.01){scm.left=-sd;scm.right=sd;scm.top=sd;scm.bottom=-sd;scm.near=.1;scm.far=sd*4;scm.updateProjectionMatrix()}}
+/* 부드러운 카메라 이동 */
+let CA=null;function camTo(t,ms){const y0=yaw,p0=pit,d0=dist,g0=tg.clone();let y1=t.yaw==null?yaw:t.yaw;while(y1-y0>Math.PI)y1-=2*Math.PI;while(y1-y0<-Math.PI)y1+=2*Math.PI;CA={t0:performance.now(),ms:ms||380,y0,p0,d0,g0,y1,p1:t.pit==null?pit:t.pit,d1:t.dist==null?dist:t.dist,g1:t.tg?t.tg.clone():g0}}
+function camAnim(){if(!CA)return;let u=Math.min(1,(performance.now()-CA.t0)/CA.ms);const e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;yaw=CA.y0+(CA.y1-CA.y0)*e;pit=CA.p0+(CA.p1-CA.p0)*e;dist=CA.d0+(CA.d1-CA.d0)*e;tg.copy(CA.g0).lerp(CA.g1,e);if(u>=1)CA=null}
+function fitBox(ids){const bx=new THREE.Box3();(ids||Object.keys(gm)).forEach(i=>{const g=gm[i];if(g){g.updateMatrixWorld(true);bx.expandByObject(g)}});return bx}
+function viewTo(k){const bx=fitBox(),c=bx.isEmpty()?V(0,1,0):bx.getCenter(V(0,0,0)),d=bx.isEmpty()?14:Math.max(4,bx.getSize(V(0,0,0)).length()*1.05);
+ const P={top:{yaw:0,pit:1.5697},front:{yaw:0,pit:.0001},right:{yaw:Math.PI/2,pit:.0001},back:{yaw:Math.PI,pit:.0001},left:{yaw:-Math.PI/2,pit:.0001},iso:{yaw:.8,pit:.5},fit:{}}[k];camTo(Object.assign({tg:c,dist:d},P))}
+function setOrtho(on){cam=on?camO:camP;$('vort').classList.toggle('on',on);$('vort').textContent=on?'평행':'원근'}
+function rs(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;rd.setSize(w,h,false);camP.aspect=w/h;camP.updateProjectionMatrix()}
 addEventListener('resize',rs);
 
 /* 형상 생성 (단위 mm, 그룹 스케일 0.001) */
+let COLM='status';try{COLM=localStorage.getItem('p3d_col')||'status'}catch(e){}
+const SUSR=/SUS|STS|304|316|321|SS\b|STAINLESS/i;
+function matOf(o){if(COLM!=='real')return{color:ST[o.status],roughness:.5,metalness:.3};const t=o.type;
+ if(EQ.includes(t))return{color:0xdfe3e8,roughness:.6,metalness:.15};
+ if(t==='support')return{color:0xc08a2c,roughness:.6,metalness:.25};
+ if(t==='inst')return{color:0x4b6584,roughness:.45,metalness:.35};
+ if(['valve','strainer','trap','psv'].includes(t))return{color:0x3f5f73,roughness:.45,metalness:.45};
+ if(SUSR.test(o.spec||''))return{color:0xc7ccd3,roughness:.22,metalness:.85};
+ return{color:0x667180,roughness:.42,metalness:.6}}
 function build(o){
-const m=new THREE.MeshStandardMaterial({color:ST[o.status],roughness:.55,metalness:.25}),g=new THREE.Group();
+const m=new THREE.MeshStandardMaterial(matOf(o)),g=new THREE.Group();
 const R=od(o.nps||4)/2,L=o.len,D=o.dia,M=Math.PI/2;
 const cyl=(r,h)=>new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,28),m);
 const box=(a,b,c)=>new THREE.Mesh(new THREE.BoxGeometry(a,b,c),m);
@@ -551,8 +593,11 @@ if(LIN.includes(o.type)||o.type==='support'){
 if(!LIN.includes(o.type))(o.type==='pump'?pumpNz(o):(o.nz||[])).forEach(z=>{const e=nzGeo(o,z),n=new THREE.Group(),Rn=od(z.nps)/2,[fo,th,nb]=fl(z.nps,z.cls||150);n.position.set(e.b[0],e.b[1],e.b[2]);n.quaternion.setFromRotationMatrix(bas(e.d));n.add(cx(Rn,-30,z.len),cx(fo/2,z.len-th,z.len));bolts(n,fo,th,nb,z.len,-1,z.nps,z.cls||150);const rj=z.face==='RTJ'?rjd(z.nps,z.cls||150):null;if(rj)n.add(cx(rj.K/2,z.len,z.len+rj.E),gv(rj,z.len+rj.E+.3));g.add(n)});
 if(o.ex)g.traverse(c=>{if(c.material){c.material=c.material.clone();if(c.material.color&&c.material.color.getHex()===ST[o.status])c.material.color.setHex(0x9aa3ad);c.material.transparent=true;c.material.opacity=.5;c.material.depthWrite=false}});
 g.position.set(o.pos[0]*S,o.pos[1]*S,o.pos[2]*S);g.scale.setScalar(S);g.userData.id=o.id;return g}
-function rb(o){const old=gm[o.id];if(old){sc.remove(old);old.traverse(c=>{if(c.geometry)c.geometry.dispose()})}const g=build(o);gm[o.id]=g;sc.add(g);if(o.id===sid||ml.includes(o.id))hl();rgk()}
-function hl(){mb.forEach(b=>sc.remove(b));mb=[];if(ml.length>1)ml.forEach(id=>{const g=gm[id];if(g){g.updateMatrixWorld(true);const b=new THREE.BoxHelper(g,0xef4444);sc.add(b);mb.push(b)}});mkp();hlHint();const g=gm[sid];if(!g){if(bh)bh.visible=false;return}g.updateMatrixWorld(true);if(!bh){bh=new THREE.BoxHelper(g,0xef4444);sc.add(bh)}else bh.setFromObject(g);bh.visible=true}
+function rb(o){const old=gm[o.id];if(old){sc.remove(old);old.traverse(c=>{if(c.geometry)c.geometry.dispose()})}const g=build(o);g.traverse(c=>{if(c.isMesh&&c.material&&c.material.isMeshStandardMaterial&&!c.material.transparent){c.castShadow=true;c.receiveShadow=true}});gm[o.id]=g;sc.add(g);if(o.id===sid||ml.includes(o.id))hl();rgk()}
+let GLW=new Set();
+function glow(id,on){const g=gm[id];if(!g)return;g.traverse(c=>{const m=c.material;if(m&&m.emissive){if(on&&!m.__own){c.material=m.clone();c.material.__own=true}const mm=c.material;mm.emissive.setHex(on?0x0ea5e9:0);mm.emissiveIntensity=on?.55:0}})}
+function hl(){mb.forEach(b=>sc.remove(b));mb=[];const now=new Set(ml.length>1?ml:(sid!=null?[sid]:[]));GLW.forEach(id=>{if(!now.has(id))glow(id,false)});now.forEach(id=>glow(id,true));GLW=now;
+ if(ml.length>1)ml.forEach(id=>{const g=gm[id];if(g){g.updateMatrixWorld(true);const b=new THREE.BoxHelper(g,0x0ea5e9);b.material.transparent=true;b.material.opacity=.35;sc.add(b);mb.push(b)}});mkp();hlHint();const g=gm[sid];if(!g){if(bh)bh.visible=false;return}g.updateMatrixWorld(true);if(!bh){bh=new THREE.BoxHelper(g,0x0ea5e9);bh.material.transparent=true;bh.material.opacity=.45;sc.add(bh)}else bh.setFromObject(g);bh.visible=true}
 
 /* 이력·저장 */
 /* 작업(Job): 작업마다 따로 저장, 왔다갔다 가능 */
@@ -560,9 +605,17 @@ const JK='p3d_jobs',JC='p3d_cur';let jobs=[],cur=null;
 const jload=()=>{try{jobs=JSON.parse(localStorage.getItem(JK)||'[]')||[]}catch(e){jobs=[]}},jidx=()=>{try{localStorage.setItem(JK,JSON.stringify(jobs))}catch(e){}};
 const jdat=id=>{try{return JSON.parse(localStorage.getItem('p3d_job_'+id)||'null')}catch(e){return null}};
 const jtm=t=>t?new Date(t).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-function save(){if(!cur)return;try{localStorage.setItem('p3d_job_'+cur,JSON.stringify({objs,log,cnt,nid,jd,dm}));const j=jobs.find(x=>x.id===cur);if(j){j.updated=Date.now();j.n=objs.length;jidx()}}catch(e){}}
+/* 되돌리기·다시하기: 바뀔 때마다 직전 상태를 보관 (0.7초 안의 연속 변경은 한 번으로) */
+let UH=[],RH2=[],curSnap=null,lastPush=0,undoing=false;const snapOf=()=>JSON.stringify({objs,cnt,nid,jd,dm});
+function undoUI(){const u=$('undo'),r2=$('redo');if(u)u.disabled=!UH.length;if(r2)r2.disabled=!RH2.length}
+function histReset(){UH=[];RH2=[];curSnap=snapOf();undoUI()}
+function histTrack(){if(undoing)return;const s2=snapOf();if(curSnap!=null&&s2!==curSnap){if(Date.now()-lastPush>700||!UH.length){UH.push(curSnap);if(UH.length>150)UH.shift()}lastPush=Date.now();RH2=[]}curSnap=s2;undoUI()}
+function applySnap(sn){undoing=true;const d=JSON.parse(sn);Object.values(gm).forEach(g=>sc.remove(g));gm={};GLW=new Set();objs=d.objs||[];cnt=d.cnt||{};nid=d.nid||1;jd=d.jd||{};dm=d.dm||{};sid=null;sj=null;ml=[];objs.forEach(rb);hl();rp();curSnap=sn;save();undoing=false;undoUI()}
+function undo(){if(!UH.length)return;RH2.push(curSnap);applySnap(UH.pop());$('hint').textContent='되돌렸습니다 (다시하기: Ctrl+Y)'}
+function redo(){if(!RH2.length)return;UH.push(curSnap);applySnap(RH2.pop());$('hint').textContent='다시 했습니다'}
+function save(){histTrack();if(!cur)return;try{localStorage.setItem('p3d_job_'+cur,JSON.stringify({objs,log,cnt,nid,jd,dm}));const j=jobs.find(x=>x.id===cur);if(j){j.updated=Date.now();j.n=objs.length;jidx()}}catch(e){}}
 function jOpen(id){if(cur&&cur!==id)save();const j=jobs.find(x=>x.id===id);if(!j)return;cur=id;try{localStorage.setItem(JC,id)}catch(e){}
- const d=jdat(id)||{};Object.values(gm).forEach(g=>sc.remove(g));gm={};objs=d.objs||[];log=d.log||[];cnt=d.cnt||{};nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);jd=d.jd||{};dm=d.dm||{};sid=null;sj=null;ml=[];objs.forEach(rb);hl();rp();hint();jUI();phLoad().then(rp);$('jobm').hidden=true;$('iso').hidden=true;$('jst').textContent='';rs()}
+ const d=jdat(id)||{};Object.values(gm).forEach(g=>sc.remove(g));gm={};objs=d.objs||[];log=d.log||[];cnt=d.cnt||{};nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);jd=d.jd||{};dm=d.dm||{};sid=null;sj=null;ml=[];objs.forEach(rb);hl();rp();hint();jUI();phLoad().then(rp);histReset();$('jobm').hidden=true;$('iso').hidden=true;$('jst').textContent='';rs()}
 function jNew(name){name=String(name||'').trim();if(!name)return false;if(cur)save();const id='j'+Date.now();jobs.unshift({id,name,created:Date.now(),updated:Date.now(),n:0});jidx();try{localStorage.setItem('p3d_job_'+id,JSON.stringify({objs:[],log:[],cnt:{},nid:1,jd:{},dm:{}}))}catch(e){}jOpen(id);lg('새 작업 시작: '+name);return true}
 function jUI(){const j=jobs.find(x=>x.id===cur);$('jobn').textContent='작업: '+(j?j.name:'-');document.title=(j?j.name+' — ':'')+'PLANT 3D';
  const L=jobs.slice().sort((a,b)=>(b.id===cur)-(a.id===cur)||b.updated-a.updated);
@@ -637,7 +690,7 @@ addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(document.activeEl
  else if(k==='ArrowUp'||k==='ArrowDown'){const f=V(-Math.sin(yaw),0,-Math.cos(yaw)),s=k==='ArrowUp'?1:-1;ax=Math.abs(f.x)>=Math.abs(f.z)?[Math.sign(f.x)*s*st,0,0]:[0,0,Math.sign(f.z)*s*st]}
  else if(k==='PageUp'||k==='q'||k==='Q')ax=[0,st,0];else if(k==='PageDown'||k==='e'||k==='E')ax=[0,-st,0];
  if(ax){e.preventDefault();mvSel(...ax)}});
-addEventListener('keydown',e=>{if(e.key==='Escape'&&al!=null)endAl();if(e.key==='Escape'&&jm)joinEnd();if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||!$('iso').hidden||!$('jobm').hidden)return;if((e.key==='a'||e.key==='A')&&(e.ctrlKey||e.metaKey)){e.preventDefault();setSel(objs.map(o=>o.id));return}if((e.key==='a'||e.key==='A')&&!e.ctrlKey&&!e.metaKey&&!e.altKey)selLinked();if((e.key==='r'||e.key==='R')&&!e.ctrlKey&&!e.metaKey&&selIds().length)rotSel('y',e.shiftKey?1:-1)});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&al!=null)endAl();if(e.key==='Escape'&&jm)joinEnd();if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||!$('iso').hidden||!$('jobm').hidden)return;if((e.key==='a'||e.key==='A')&&(e.ctrlKey||e.metaKey)){e.preventDefault();setSel(objs.map(o=>o.id));return}if((e.key==='a'||e.key==='A')&&!e.ctrlKey&&!e.metaKey&&!e.altKey)selLinked();if((e.key==='r'||e.key==='R')&&!e.ctrlKey&&!e.metaKey&&selIds().length)rotSel('y',e.shiftKey?1:-1);if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')){e.preventDefault();e.shiftKey?redo():undo()}if((e.ctrlKey||e.metaKey)&&(e.key==='y'||e.key==='Y')){e.preventDefault();redo()}if((e.key==='f'||e.key==='F')&&!e.ctrlKey&&!e.metaKey){selIds().length?window.P3D.focus(selIds()):viewTo('fit')}});
 
 const EH=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* ===== ISO 파일 첨부 (IndexedDB 저장, 여러 장) ===== */
@@ -657,10 +710,10 @@ window.P3D={_rb:o=>rb(o),_scr:id=>{const g=gm[id];if(!g)return null;const c=new 
  getObjs:()=>objs,
  removeWhere:pr=>{const rm=objs.filter(pr);rm.forEach(o=>{const g=gm[o.id];if(g){sc.remove(g);g.traverse(c=>{if(c.geometry)c.geometry.dispose()})}delete gm[o.id]});objs=objs.filter(o=>!pr(o));sid=null;ml=[];rgk();hl();rp();save();return rm.length},
  showIso:id=>{sid=id;ml=[];iso('line')},
- focus:ids=>{$('iso').hidden=true;ml=ids.filter(i=>gm[i]);sid=null;hl();rp();const bx=new THREE.Box3();ml.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});if(!bx.isEmpty()){tg.copy(bx.getCenter(new THREE.Vector3()));dist=Math.max(4,bx.getSize(new THREE.Vector3()).length()*1.2)}}};
+ focus:ids=>{$('iso').hidden=true;ml=ids.filter(i=>gm[i]);sid=null;hl();rp();const bx=new THREE.Box3();ml.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});if(!bx.isEmpty())camTo({tg:bx.getCenter(new THREE.Vector3()),dist:Math.max(4,bx.getSize(new THREE.Vector3()).length()*1.2)})}};
 $('isob').addEventListener('change',async e=>{if(e.target.id!=='attin')return;const t=Date.now();let i=0;for(const f of e.target.files){await fPut({id:'f'+t+'_'+(i++),job:cur,name:f.name,type:f.type||(/\.pdf$/i.test(f.name)?'application/pdf':''),size:f.size,blob:f,added:t+i})}attOpen()});
 $('isob').addEventListener('click',async e=>{const b=e.target.closest('[data-att]');if(!b)return;const a=b.dataset.att,c=b.closest('.attc');if(a==='del'&&c&&confirm('이 첨부 파일을 삭제할까요?')){await fDel(c.dataset.fid);attOpen()}else if(a==='view')attBig(c.dataset.fid);else if(a==='back')attOpen();else if(window.P3DX){if(a==='wiz')P3DX.wizard(c.dataset.fid);else if(a==='ai')P3DX.convert(c.dataset.fid);else if(a==='table')P3DX.table(c.dataset.fid);else if(a==='aicfg')P3DX.settings();else if(a==='manual')P3DX.manual()}});
-$('isoc').onclick=()=>{$('iso').hidden=true;$('iso3').hidden=false;$('isop').hidden=false};$('iso3').onclick=()=>{$('iso').hidden=true;const ids=isoIds.filter(i=>gm[i]);if(!ids.length)return;ml=ids.slice();sid=null;sj=null;hl();rp();const bx=new THREE.Box3();ids.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});const c=bx.getCenter(new THREE.Vector3()),z=bx.getSize(new THREE.Vector3());tg.copy(c);dist=Math.max(3,z.length()*1.3);yaw=.8;pit=.5};$('isop').onclick=()=>{try{window.print()}catch(e){}};$('isoall').onclick=isoAllPDF;$('bclash').onclick=clashUI;$('isob').addEventListener('click',e=>{const tr=e.target.closest('[data-cl]');if(tr)window.P3D.focus(tr.dataset.cl.split(',').map(Number))});$('bj').onclick=jlist;
+$('isoc').onclick=()=>{$('iso').hidden=true;$('iso3').hidden=false;$('isop').hidden=false};$('iso3').onclick=()=>{$('iso').hidden=true;const ids=isoIds.filter(i=>gm[i]);if(!ids.length)return;ml=ids.slice();sid=null;sj=null;hl();rp();const bx=new THREE.Box3();ids.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});const c=bx.getCenter(new THREE.Vector3()),z=bx.getSize(new THREE.Vector3());tg.copy(c);dist=Math.max(3,z.length()*1.3);yaw=.8;pit=.5};$('isop').onclick=()=>{try{window.print()}catch(e){}};$('isoall').onclick=isoAllPDF;$('bchk').onclick=checkUI;$('undo').onclick=undo;$('redo').onclick=redo;$('vbar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v)viewTo(b.dataset.v);else if(b.id==='vort')setOrtho(cam!==camO);else if(b.id==='vcol'){COLM=COLM==='real'?'status':'real';try{localStorage.setItem('p3d_col',COLM)}catch(e){}b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real');objs.forEach(rb);hl()}});{const b=$('vcol');b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real')}$('bclash').onclick=clashUI;$('isob').addEventListener('click',e=>{const tr=e.target.closest('[data-cl]');if(tr)window.P3D.focus(tr.dataset.cl.split(',').map(Number))});$('bj').onclick=jlist;
 $('isob').addEventListener('change',e=>{const d=e.target.dataset;if(d.d){dm[curKey]=Object.assign(dm[curKey]||{},{[d.d]:e.target.value});save();iso(lastIso)}else if(d.j)jset(d.j,d.jk,e.target.value)});$('isob').addEventListener('click',e=>{if(e.target.tagName==='SUMMARY')dOpen=!e.target.parentElement.open});
 $('ex').onclick=()=>{$('ta').value=JSON.stringify({objs,log,cnt,nid,jd,dm})};
 function applyAllNoSave(){Object.values(gm).forEach(g=>sc.remove(g));gm={};objs=[];log=[];cnt={};nid=1;jd={};dm={};sid=null;ml=[];hl();rp();hint()}
