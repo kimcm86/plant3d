@@ -4,7 +4,7 @@ importScripts('version.js');
 const CACHE = 'plant3d-' + self.P3D_VERSION;
 const FILES = [
   './', 'index.html', 'version.js', 'pwa.js', 'manifest.webmanifest',
-  'iso2d3d.js', 'isovec.js', 'vendor/three.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/xlsx.full.min.js',
+  'iso2d3d.js', 'isovec.js', 'isoocr.js', 'vendor/three.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/xlsx.full.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'
 ];
 self.addEventListener('install', e => {
@@ -22,6 +22,11 @@ self.addEventListener('fetch', e => {
   // 화면(HTML)은 네트워크 우선 → 실패하면 저장본, 나머지는 저장본 우선
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).catch(() => caches.match('index.html')));
+    return;
+  }
+  // 치수 읽기(OCR) 파일은 처음 쓸 때 받아 따로 보관 (버전이 바뀌어도 유지)
+  if (req.url.includes('/vendor/tess/')) {
+    e.respondWith(caches.open('p3dtess-1').then(c => c.match(req).then(hit => hit || fetch(req).then(r => { if (r.ok) c.put(req, r.clone()); return r; }))));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req)));

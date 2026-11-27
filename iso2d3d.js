@@ -709,7 +709,31 @@ RULES
       s.d = Math.round((ha + hb) * 10) / 10; s.okLen = true; s.auto = 'fit'; delete s.est; delete s.conf;
     }));
   }
+  // 도면에서 읽은 치수: 확신이 높고 헷갈릴 숫자가 없으면 묻지 않고 넣음 (끝에 표에서 확인·수정)
+  function ocrApply() {
+    W.R.runs.forEach(r => r.steps.forEach(s => {
+      if (s.okLen || !s.ocr || s.ocr.c < 90 || s.ocr.amb) return;
+      s.d = s.ocr.v; s.okLen = true; s.auto = 'ocr'; delete s.est; delete s.conf;
+    }));
+  }
+  async function wOcr() {
+    if (!window.P3DOCR || !W || !W.ext._pg) return;
+    const w0 = W; w0.ocrRun = true;
+    const say = t => { if (W !== w0) return; const el = $('wzocr'); if (el) el.textContent = t; };
+    try {
+      const near = (w0.ext.pipes || []).map(l => [l.a, l.b]);
+      const nums = await window.P3DOCR.readNumbers(w0.ext._pg.segs, w0.ext.page, { near, progress: t => { w0.ocrMsg = t; say(t); } });
+      w0.nums = nums; w0.ocrRun = false;
+      if (W !== w0) return;
+      window.P3DOCR.assign(W.R, nums);
+      const typing = $('wzd') && $('wzd').value;
+      if (!typing && W.q.phase !== 'size' && W.q.phase !== 'done') { W.q.phase = null; wFirstPhase(); wRender(); }
+      else if (W.q.phase === 'done') wRender();
+      else { const bn = document.querySelector('.wzocrb'); if (bn) bn.textContent = '✓ 도면 치수 ' + nums.length + '개를 읽었습니다. 길이 질문에 미리 채워 둡니다.'; }
+    } catch (e) { w0.ocrRun = false; w0.ocrErr = e.message; say('치수 자동 읽기를 못 했습니다 (' + e.message + '). 직접 입력해 주세요.'); }
+  }
   function wFirstPhase() {
+    if (W.q.phase !== 'size') ocrApply();
     autoLen();
     while (W.q.ri < W.R.runs.length) {
       const r = W.R.runs[W.q.ri];
@@ -728,7 +752,9 @@ RULES
     if (!nr || !nr.runs.length) return false;
     nr.runs.forEach(r => r.steps.forEach(s => { if (s.t === 'valve') delete s.vt; }));
     ['nps', 'line_no', 'cls'].forEach(k => { if (old[k] != null && old[k] !== '') nr[k] = old[k]; });
-    W.R = nr; W.q = { ri: 0, si: 0, phase: 'size' }; return true;
+    W.R = nr; W.q = { ri: 0, si: 0, phase: 'size' };
+    if (W.nums && window.P3DOCR) window.P3DOCR.assign(W.R, W.nums);
+    return true;
   }
   // 갈라진 배관(run)을 통째로 지우고, 그 갈래가 나온 티를 일반 배관으로 되돌림
   function wDropRun(ri) {
@@ -755,6 +781,7 @@ RULES
     W = { f, fid, R: res.route, ext: res, big, k: big.width / res.page.W, q: { ri: 0, si: 0, phase: 'size' }, hist: [], src: 'iso:' + fid, excl: [], startAt: 0 };
     W.R.runs.forEach(r => r.steps.forEach(s => { if (s.t === 'valve') { delete s.vt; } }));
     wRender();
+    wOcr();
   }
   function wFail(f, why) {
     P.ov('3D로 바꾸기 — ' + f.name, `<div class="wz"><p><b>${E(why)}</b></p><p>이럴 때는 이렇게 해 주세요.</p><ul><li><b>Claude 대화</b>에 이 도면을 올리고 "3D로 바꿔줘"라고 하면 모델 파일을 만들어 드립니다 → 앱에서 <b>데이터 저장/불러오기 → 모델 파일 추가</b>.</li><li>또는 <b>고급 편집</b>에서 직접 입력할 수 있습니다.</li></ul><div class="row"><button data-att="back">← 첨부 목록</button><button data-att="table">고급 편집</button></div></div>`);
@@ -780,6 +807,7 @@ RULES
       g.strokeStyle = 'rgba(37,99,235,.22)'; g.lineWidth = 16; g.lineCap = 'round'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
       [a, b].forEach(p => { g.strokeStyle = 'rgba(220,38,38,.9)'; g.lineWidth = 2.5; g.beginPath(); g.arc(p[0], p[1], 13, 0, 7); g.stroke(); });
     } else pts.forEach(p0 => { const p = T2(p0); g.strokeStyle = 'rgba(220,38,38,.9)'; g.lineWidth = 3; g.beginPath(); g.arc(p[0], p[1], 26, 0, 7); g.stroke(); });
+    if (W.ocrMark) { const o = W.ocrMark, p = T2(o.p), hh = Math.max(14, (o.h || 3) * K * sc * 1.6), ww = hh * String(o.v).length * 0.75 + 10; g.strokeStyle = 'rgba(234,88,12,.95)'; g.lineWidth = 2.5; g.strokeRect(p[0] - ww / 2 - 4, p[1] - hh / 2 - 3, ww + 8, hh + 6); g.fillStyle = 'rgba(234,88,12,.95)'; g.font = 'bold 15px sans-serif'; g.fillText('읽은 값 ' + o.v, p[0] - ww / 2 - 4, p[1] + hh / 2 + 20); }
     if (drag) { g.strokeStyle = 'rgba(220,38,38,.95)'; g.lineWidth = 3; g.setLineDash([5, 4]); g.beginPath(); g.arc(drag[0], drag[1], 15, 0, 7); g.stroke(); g.setLineDash([]); }
     if (mini) { const mg = mini.getContext('2d'), ms = mini.width / W.big.width; mini.height = Math.round(W.big.height * ms); mg.drawImage(W.big, 0, 0, mini.width, mini.height); mg.strokeStyle = '#dc2626'; mg.lineWidth = 2; mg.strokeRect(x0 * ms, y0 * ms, w * ms, h * ms); }
   }
@@ -799,7 +827,7 @@ RULES
       const n = R.runs.reduce((a, x) => a + x.steps.length, 0);
       title = '질문이 끝났습니다.';
       const na = R.runs.reduce((a, x) => a + x.steps.filter(y => y.auto === 'fit').length, 0);
-      body = `${na ? '<p>엘보·티가 플랜지나 용접점에 바로 붙은 구간 <b>' + na + '곳</b>은 길이를 묻지 않고 ASME B16.9/B16.5 치수로 넣었습니다.</p>' : ''}<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
+      body = wReview() + `${na ? '<p>엘보·티가 플랜지나 용접점에 바로 붙은 구간 <b>' + na + '곳</b>은 길이를 묻지 않고 ASME B16.9/B16.5 치수로 넣었습니다.</p>' : ''}<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
       pts = R.runs.flatMap(x => [x._p0].concat(x.steps.map(y => y._p))).filter(Boolean);
     } else if (s) {
       const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
@@ -829,8 +857,9 @@ RULES
       } else if (q.phase === 'len') {
         pts = [prev, s._p]; mode = 'seg';
         const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
-        title = branchNote + `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?`;
-        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
+        const oc = s.ocr;
+        title = branchNote + `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?` + (oc ? ` <span class="wzt wzto">도면에서 읽은 값 <b>${oc.v}</b> (확신 ${oc.c}%)${oc.amb ? ' · 근처에 다른 숫자도 있음' : ''} — 맞으면 다음, 틀리면 고치세요</span>` : '');
+        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" value="${oc ? oc.v : ''}" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
@@ -844,14 +873,49 @@ RULES
     P.ov('3D로 바꾸기 — ' + W.f.name, `<div class="wz">
  <div class="wzhd"><div class="wzbar"><i style="width:${q.phase === 'done' ? 100 : pct}%"></i></div><span class="mut">${q.phase === 'done' ? '완료' : idx + ' / ' + total}</span></div>
  <div class="wzmain"><canvas id="wzcv" width="1100" height="560"></canvas><canvas id="wzmini" width="220" height="150"></canvas></div>
- <h3 class="wzq">${title}</h3>${body}
+ <h3 class="wzq">${title}</h3>${W.ocrRun ? `<p class="wzocrb">⏳ <span id="wzocr">${E(W.ocrMsg || '도면 치수 읽는 중…')}</span> — 다 읽으면 길이가 자동으로 채워집니다.</p>` : ''}${body}
  <div class="row wzft"><button data-wz="back"${W.hist.length ? '' : ' disabled'}>← 이전</button><span style="flex:1"></span><button data-att="back">그만두기</button><button data-wz="adv" class="ghost">고급 편집</button></div>
  <div id="wzmsg" class="mut"></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
     const marks = q.phase === 'size' ? (R.cands || []).filter(c => dist2(c, R.runs[0]._p0) > 1) : null;
+    W.ocrMark = q.phase === 'len' && s && s.ocr ? s.ocr : null;
     wView(pts.filter(Boolean), mode, marks);
+    if (q.phase === 'done') wReviewBind();
     if (q.phase === 'size' && R.cands && R.cands.length > 1) wPick(pts.filter(Boolean), mode, marks);
     const d = $('wzd'); if (d) { d.focus(); d.onkeydown = e => { if (e.key === 'Enter') wAnswer('len'); }; }
+  }
+  const WHAT = { elbow: '엘보', flange: '플랜지', valve: '밸브', tee: '티', tee_in: '티(만남)', reducer: '레듀서', end: '끝', equip: '장치', inst: '계기' };
+  const SRC = { ocr: ['도면 읽음', 'ok'], 'ocr-ok': ['도면 읽음·확인', 'ok'], fit: ['ASME 자동', 'fit'], user: ['직접 입력', 'us'], est: ['어림값', 'bad'] };
+  // 끝 화면: 구간별 길이와 그 출처를 한눈에 보고 바로 고치기
+  function wReview() {
+    const rows = [];
+    W.R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
+      const src = SRC[s.auto] || (s.est ? SRC.est : SRC.user);
+      const oc = s.ocr && s.auto !== 'ocr' && s.auto !== 'ocr-ok' && +s.ocr.v !== +s.d ? ` <span class="mut">(도면: ${s.ocr.v})</span>` : '';
+      rows.push(`<tr data-wzrow="${ri}.${si}"><td>${ri + 1}-${si + 1}</td><td>${WHAT[s.t] || s.t}</td><td><input data-wzlen="${ri}.${si}" type="number" value="${E(String(s.d))}"> mm${oc}</td><td><span class="wzsrc ${src[1]}">${src[0]}${s.auto === 'ocr' ? ' ' + s.ocr.c + '%' : ''}</span></td></tr>`);
+    }));
+    const cnt = k => W.R.runs.reduce((a, r) => a + r.steps.filter(s => k.includes(s.auto || (s.est ? 'est' : 'user'))).length, 0);
+    const no = cnt(['ocr', 'ocr-ok']), ne = cnt(['est']);
+    const st = W.ocrRun ? '' : (W.ocrErr ? '<p class="mut">치수 자동 읽기를 못 했습니다 — 길이는 직접 넣은 값입니다.</p>' : '');
+    return `${st}<p>도면에서 읽은 치수 <b>${no}곳</b>${ne ? ', 어림값 <b style="color:#b91c1c">' + ne + '곳</b>' : ''}. 줄을 누르면 위 그림에 그 구간이 보입니다. 틀린 길이는 바로 고치세요.</p>
+<div class="wzrev"><table><thead><tr><th>구간</th><th>→ 지점</th><th>길이</th><th>출처</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+  function wReviewBind() {
+    document.querySelectorAll('[data-wzrow]').forEach(tr => {
+      tr.onclick = e => {
+        const [ri, si] = tr.dataset.wzrow.split('.').map(Number), r = W.R.runs[ri], s = r.steps[si], prev = si === 0 ? r._p0 : r.steps[si - 1]._p;
+        document.querySelectorAll('[data-wzrow].on').forEach(x => x.classList.remove('on')); tr.classList.add('on');
+        W.ocrMark = s.ocr || null; wView([prev, s._p].filter(Boolean), 'seg'); W.ocrMark = null;
+      };
+    });
+    document.querySelectorAll('[data-wzlen]').forEach(inp => {
+      inp.onchange = () => {
+        const [ri, si] = inp.dataset.wzlen.split('.').map(Number), s = W.R.runs[ri].steps[si], n = +inp.value;
+        if (!(n > 0)) { inp.value = s.d; return; }
+        wSnap(); s.d = n; s.okLen = true; s.auto = s.ocr && +s.ocr.v === n ? 'ocr-ok' : 'user'; delete s.est; delete s.conf;
+        const sp = inp.closest('tr').querySelector('.wzsrc'), src = SRC[s.auto]; sp.className = 'wzsrc ' + src[1]; sp.textContent = src[0];
+      };
+    });
   }
   const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   // 시작점 고르기: 초록 원(배관 끝)을 누르거나 빨간 원을 끌어다 놓으면 그 끝에서 다시 시작
@@ -915,7 +979,7 @@ RULES
       } else { s.nps2 = +v; s.okBranch = true; R.runs.forEach(x => { if (x.start && x.start.tee === s.id) x.nps = +v; }); wAdvance(); }
     }
     else if (k === 'len') {
-      if (v !== 'skip') { const el = $('wzd'), n = +(el && el.value); if (!(n > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '숫자를 입력해 주세요. 치수가 안 보이면 "치수가 안 보임"을 누르세요.'; return; } s.d = n; delete s.conf; delete s.est; }
+      if (v !== 'skip') { const el = $('wzd'), n = +(el && el.value); if (!(n > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '숫자를 입력해 주세요. 치수가 안 보이면 "치수가 안 보임"을 누르세요.'; return; } s.d = n; delete s.conf; delete s.est; s.auto = s.ocr && +s.ocr.v === n ? 'ocr-ok' : 'user'; } else s.auto = 'est';
       s.okLen = true; wAdvance();
     }
     else if (k === 'end') {
@@ -953,6 +1017,8 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 .wzmain{position:relative;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;background:#fff}#wzcv{display:block;width:100%;height:auto}#wzmini{position:absolute;right:8px;bottom:8px;width:200px;border:1px solid #94a3b8;background:#fff;opacity:.92}
 .wzq{font-size:20px;margin:14px 0 10px}.wzt{display:inline-block;background:#e0f2fe;color:#075985;border-radius:4px;padding:1px 8px;font-size:14px;vertical-align:middle}
 .wzb{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.wzb button{font-size:17px;padding:10px 16px;border-radius:8px;min-width:90px}.wzb button.on{outline:3px solid #0f766e}.wz button.big{font-size:18px;padding:12px 22px}.wz button.ghost{background:#f8fafc;color:#475569}.wzno{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px}.wzno span{font-size:14px;color:#9a3412}.wzno button{font-size:15px;padding:7px 12px}.wz button.warn{background:#fff;color:#b91c1c;border-color:#fca5a5}
+.wzrev{max-height:300px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;margin:6px 0 10px}.wzrev table{width:100%;border-collapse:collapse;font-size:15px}.wzrev th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:6px 8px}.wzrev td{padding:4px 8px;border-top:1px solid #f1f5f9}.wzrev tr[data-wzrow]{cursor:pointer}.wzrev tr.on td{background:#e0f2fe}.wzrev input{width:90px;font-size:15px;padding:3px 6px}
+.wzocrb{background:#fff7ed;border:1px dashed #fdba74;border-radius:6px;padding:5px 10px;font-size:14px;color:#9a3412;margin:0 0 6px}.wzsrc{display:inline-block;border-radius:4px;padding:1px 8px;font-size:13px}.wzsrc.ok{background:#dcfce7;color:#166534}.wzsrc.fit{background:#e0f2fe;color:#075985}.wzsrc.us{background:#f1f5f9;color:#334155}.wzsrc.bad{background:#fee2e2;color:#991b1b}.wzt.wzto{background:#ffedd5;color:#9a3412}
 .wzs{gap:12px;flex-wrap:wrap;margin:8px 0}.wzs input{font-size:16px;padding:6px}.wzft{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:10px}
 @media(max-width:700px){#wzmini{display:none}.wzq{font-size:17px}}`;
   document.head.appendChild(wcss);

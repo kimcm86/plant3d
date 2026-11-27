@@ -409,7 +409,7 @@
     const A = analyze(pg);
     const mm = 50 * 842 / pg.W, route = toRoute(A, mm);
     const snaps = []; A.pipes.forEach(l => { snaps.push(l.a, l.b); (l.feats || []).forEach(f => snaps.push(A.P(l, f.s))); });
-    return { snaps, page: { W: pg.W, H: pg.H }, stats: { segs: pg.segs.length, fills: pg.fills.length, dots: A.dots.length, arrows: A.arrows.length, pipes: A.pipes.length }, pipes: A.pipes.map(l => ({ a: l.a, b: l.b, ax: l.ax, feats: (l.feats || []).map(f => ({ t: f.t, p: A.P(l, f.s) })) })), dots: A.dots, route, _A: A, _mm: mm };
+    return { snaps, page: { W: pg.W, H: pg.H }, stats: { segs: pg.segs.length, fills: pg.fills.length, dots: A.dots.length, arrows: A.arrows.length, pipes: A.pipes.length }, pipes: A.pipes.map(l => ({ a: l.a, b: l.b, ax: l.ax, feats: (l.feats || []).map(f => ({ t: f.t, p: A.P(l, f.s) })) })), dots: A.dots, route, _A: A, _mm: mm, _pg: pg };
   }
 
   const reroute = (res, opt) => toRoute(res._A, res._mm, opt);
