@@ -100,7 +100,8 @@ RULES
     const mk = (type, ex) => {
       const o = Object.assign({ id: id++, type, status: '미착수', note: '' }, JSON.parse(JSON.stringify(P.DEF[type])), { cls: +R.cls || 150 }, base, ex);
       if (ex.tag) o.tag = ex.tag; else { cnt[type] = (cnt[type] || 0) + 1; o.tag = P.T[type].p + '-' + String(cnt[type]).padStart(3, '0'); }
-      if (['valve', 'flange', 'tee', 'reducer', 'cap'].includes(type) && ex.len == null) o.len = P.dflen(o);
+      if (['elbow', 'tee', 'cap', 'coupling'].includes(type) && o.ce == null) o.ce = [.5, .75, 1, 1.5, 2].includes(+o.nps) ? (R.ce || 'sw') : 'bw'; // 2" 이하 이음 방식
+      if (['valve', 'flange', 'tee', 'reducer', 'cap', 'coupling'].includes(type) && ex.len == null) o.len = P.dflen(o);
       if (o.pos) o.pos = R1(o.pos);
       if (src) o.src = src;
       out.push(o);
@@ -687,8 +688,9 @@ RULES
   // 배관이 없는 '부품 맞붙임' 구간 → ASME B16.9(엘보·티 중심~끝) + B16.5(플랜지) 치수로 길이를 자동으로 넣는다
   function fitHalf(kind, n) {
     const R = W.R, cls = +R.cls || 150;
-    if (kind === 'elbow') return P.eg({ type: 'elbow', kind: 'lr90', nps: n, axis: '+X', turn: '+Y', pos: [0, 0, 0] }).R;
-    if (kind === 'tee' || kind === 'tee_in') return P.dflen({ type: 'tee', nps: n }) / 2;
+    const ce = [.5, .75, 1, 1.5, 2].includes(+n) ? (R.ce || 'sw') : 'bw';
+    if (kind === 'elbow') return P.eg({ type: 'elbow', kind: 'lr90', nps: n, ce, axis: '+X', turn: '+Y', pos: [0, 0, 0] }).R;
+    if (kind === 'tee' || kind === 'tee_in') return P.dflen({ type: 'tee', nps: n, ce }) / 2;
     if (kind === 'flange') return P.HGx(cls, 'RF', n) + P.dflen({ type: 'flange', nps: n, kind: 'wn', cls });
     if (kind === 'weld') return 0;
     return null;
@@ -791,7 +793,7 @@ RULES
       { const r0 = R.runs[0], s0 = r0.steps[0]; pts = s0 && s0._p ? [r0._p0, s0._p] : [r0._p0]; if (pts.length > 1) mode = 'seg'; }
       title = '빨간 원에서 배관이 시작합니다 (파란 띠 = 첫 구간). 맞으면 배관 크기를 고르세요.<br><span class="wzt">틀리면 도면에서 초록 원(배관 끝) 중 진짜 시작점을 누르거나, 빨간 원을 끌어다 놓으세요</span>';
       body = `<div class="wzb">${QS.map(v => btn('size:' + v, nf(v), (+R.nps === v ? 'on' : ''))).join('')}</div>
-        <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label></div>
+        <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label><label>2" 이하 이음 <select id="wzce">${opt([['sw', 'SW 소켓 용접'], ['bw', 'BW 맞대기'], ['thd', '나사 (THD)']], R.ce || 'sw')}</select></label></div>
         <div class="wzno"><span>시작점이 틀렸나요?</span>${btn('notpipe', '✕ 파란 띠는 배관이 아님 (점선·치수선 등)', 'warn')}${(R.nStarts || 1) > 1 ? btn('nextstart', '↻ 다른 끝에서 시작 (' + ((R.startIdx || 0) + 1) + ' / ' + R.nStarts + ')', 'ghost') : ''}</div>`;
     } else if (q.phase === 'done') {
       const n = R.runs.reduce((a, x) => a + x.steps.length, 0);
@@ -895,7 +897,7 @@ RULES
     }
     wSnap();
     const [k, v] = a.split(':');
-    if (k === 'size') { R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; wAdvance(); }
+    if (k === 'size') { R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
     else if (k === 'type') {
       if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
       else { if (v === 'flange') { s.t = 'flange'; delete s.vt; } else { s.t = 'valve'; s.vt = v; s.conn = 'flg'; } s.okType = true; wAdvance(); }
