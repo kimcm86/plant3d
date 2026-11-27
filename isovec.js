@@ -171,9 +171,9 @@
       const et = [l.a, l.b].some(e => onL(m, e, 1.0));
       if (ee || et) adj[i].push(j);
     }
-    const nearEnd = (l, p) => { const s = p[0] * l.u[0] + p[1] * l.u[1], o = p[0] * l.n[0] + p[1] * l.n[1]; return Math.abs(o - l.off) < 1.2 && s > l.s0 - 0.8 && s < l.s1 + 0.8; };
+    const nearEnd = (l, p) => { const s = p[0] * l.u[0] + p[1] * l.u[1], o = p[0] * l.n[0] + p[1] * l.n[1]; return Math.abs(o - l.off) < 1.2 && s > l.s0 - 1.3 && s < l.s1 + 1.3; }; // 용접점이 선 끝에 붙어 있음 (보조선은 2pt 이상 떨어져 시작)
     // 배관을 가로질러 양쪽으로 튀어나온 짧은 획 = 플랜지 면·밸브 기호 (배관 아님)
-    const straddle = l => l.len < 20 && bridged.some(m => { if (m.ax === l.ax || m.len < 15) return false; const xi = isect(l, m); return xi && xi.sm > m.s0 + 1 && xi.sm < m.s1 - 1 && xi.sl - l.s0 > 2 && l.s1 - xi.sl > 2; });
+    const straddle = l => l.len < 20 && bridged.some(m => { if (m === l || m.ax === l.ax || m.len < 8) return false; const xi = isect(l, m); return xi && xi.sm > m.s0 - 9 && xi.sm < m.s1 + 9 && xi.sl - l.s0 > 2 && l.s1 - xi.sl > 2; }); // 배관 끝의 플랜지 면 획도 포함
     const seed = bridged.map(l => l.len >= 8 && dots.some(d => nearEnd(l, d)) && !straddle(l));
     const keep = new Array(N).fill(false), st = [];
     seed.forEach((v, i) => { if (v) keep[i] = true; });
@@ -248,6 +248,22 @@
         const xi = isect(l, m); if (xi && dist(xi.X, p) < 9 && xi.sm > m.s0 - 2 && xi.sm < m.s1 + 2) drop.add(m); });
     });
     for (let i = pipes.length - 1; i >= 0; i--) if (drop.has(pipes[i])) pipes.splice(i, 1);
+    // 레듀서(사다리꼴): 배관 양옆에서 같은 쪽으로 좁아지는 빗선 2개 (배관 축을 가로지르지 않음)
+    pipes.forEach(l => {
+      const sd = segs.filter(q => !q.isFill).map(([a, b]) => ({ a, b, len: dist(a, b), ang: deg(b[0] - a[0], b[1] - a[1]) })).filter(q => q.len >= 4 && q.len < 20 && !isoAng(q.ang)).map(q => {
+        const oa = q.a[0] * l.n[0] + q.a[1] * l.n[1] - l.off, ob = q.b[0] * l.n[0] + q.b[1] * l.n[1] - l.off, sa = q.a[0] * l.u[0] + q.a[1] * l.u[1], sb = q.b[0] * l.u[0] + q.b[1] * l.u[1];
+        const [s0, o0, s1, o1] = sa < sb ? [sa, oa, sb, ob] : [sb, ob, sa, oa];
+        return { s0, s1, o0, o1, side: Math.sign(o0 + o1), taper: Math.sign(Math.abs(o1) - Math.abs(o0)) };
+      }).filter(q => q.o0 * q.o1 > 0 && Math.min(Math.abs(q.o0), Math.abs(q.o1)) > 1 && Math.max(Math.abs(q.o0), Math.abs(q.o1)) < 8 && Math.abs(Math.abs(q.o1) - Math.abs(q.o0)) > 1 && q.s1 > l.s0 - 2 && q.s0 < l.s1 + 2);
+      sd.forEach((a, i) => sd.slice(i + 1).forEach(b => {
+        if (a.side === b.side || a.taper !== b.taper) return;
+        const ov = Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0); if (ov < 0.5 * Math.min(a.s1 - a.s0, b.s1 - b.s0)) return;
+        const sv = Math.min(l.s1 - 0.6, Math.max(l.s0 + 0.6, (Math.max(a.s0, b.s0) + Math.min(a.s1, b.s1)) / 2));
+        if ((l.feats || []).some(f => ((f.t === 'valve' && f.iso) || f.t === 'reducer') && Math.abs(f.s - sv) < 8)) return;
+        l.feats = (l.feats || []).filter(f => Math.abs(f.s - sv) > (f.t === 'valve' ? 7 : 5)); // 레듀서 빗변을 밸브로 읽은 것 제거
+        l.feats.push({ t: 'reducer', s: sv }); l.feats.sort((x, y) => x.s - y.s);
+      }));
+    });
     // 캡(ㄷ 모양): 배관 끝 5pt 안에 짧은 획 3개 이상
     const tiny = segs.filter(q => !q.isFill).filter(([a, b]) => { const n = dist(a, b); return n >= 2 && n <= 6; });
     const caps = [];
@@ -336,7 +352,7 @@
         else if (d !== dir) { put({ t: 'elbow', to: d, conf: 'low' }, node.p); dir = d; }
         // 구간 안 기호(진행 방향 순서)
         const fs = e.feats.map(f => ({ f, p: pt(e.l, f.s) })).sort((a, b) => dist(node.p, a.p) - dist(node.p, b.p));
-        fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : Object.assign({ t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, f.iso ? { vguess: 'gate' } : {}), p));
+        fs.forEach(({ f, p }) => put(f.t === 'flange' ? { t: 'flange', conf: 'low' } : f.t === 'reducer' ? { t: 'reducer', rt: 'conc', conf: 'low' } : Object.assign({ t: 'valve', vt: 'gate', conn: 'flg', conf: 'low' }, f.iso ? { vguess: 'gate' } : {}), p));
         node = other;
         const rest = node.edges.filter(x => !used.has(x));
         if (!rest.length) {

@@ -198,14 +198,15 @@ RULES
           }
           case 'valve': {
             const vt = p.vt || 'gate', conn = p.conn === 'bw' ? 'bw' : 'flg';
-            const ex = { pos: [0, 0, 0], axis: d, nps: st.nps, vt, conn, face: 'RF' };
+            const vn = +p.vnps || st.nps; // 밸브가 배관보다 작을 수 있음 (예: 3/4" 배관에 1/2" 밸브)
+            const ex = { pos: [0, 0, 0], axis: d, nps: vn, vt, conn, face: 'RF' };
             if (p.tag) ex.tag = p.tag;
             const v = mk('valve', ex);
             v.len = P.dflen(v);
             const wafer = ['butterfly', 'wcheck'].includes(vt);
             v.pos = R1(add3(C, d, -v.len / 2));
             if (conn === 'flg') {
-              const h = P.HGx(+R.cls || 150, 'RF', st.nps), pr = { nps: st.nps, kind: 'wn', face: 'RF' };
+              const h = P.HGx(+R.cls || 150, 'RF', vn), pr = { nps: vn, kind: 'wn', face: 'RF' };
               const g = wafer ? 0 : h;
               const f1 = mk('flange', Object.assign({ pos: R1(add3(v.pos, d, -g - h)), axis: neg(d) }, pr));
               pipeTo(add3(f1.pos, neg(d), f1.len), si);
@@ -674,7 +675,13 @@ RULES
   /* ================= 질문식 3D 변환 (한 번에 하나씩) ================= */
   let W = null;
   const QS = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24];
-  const phasesOf = s => (['flange', 'valve'].includes(s.t) && !s.okType ? ['type'] : []).concat(s.t === 'tee' && !s.okBranch ? ['branch'] : []).concat(s.okLen ? [] : ['len']).concat(s.t === 'end' && !s.okEnd ? ['end'] : []);
+  const phasesOf = s => (['flange', 'valve'].includes(s.t) && !s.okType ? ['type'] : []).concat(s.t === 'valve' && s.okType && !s.okVsize ? ['vsize'] : []).concat(s.t === 'reducer' && !s.okRed ? ['rsize'] : []).concat(s.t === 'tee' && !s.okBranch ? ['branch'] : []).concat(s.okLen ? [] : ['len']).concat(s.t === 'end' && !s.okEnd ? ['end'] : []);
+  // 이 지점에서의 배관 크기 (런 크기 → 앞쪽 레듀서 반영)
+  function npsAt(ri, si) {
+    const R = W.R, r = R.runs[ri]; let n = +r.nps || +R.nps || 4;
+    r.steps.slice(0, si).forEach(x => { if (x.t === 'reducer' && +x.nps2) n = +x.nps2; });
+    return n;
+  }
   function wRemain() { let n = W.q.phase === 'size' ? 1 : 0; W.R.runs.forEach(r => r.steps.forEach(s => { n += phasesOf(s).length; })); return n; }
   function wFirstPhase() {
     while (W.q.ri < W.R.runs.length) {
@@ -770,10 +777,23 @@ RULES
         title = branchNote + '빨간 원 안의 표시는 무엇인가요?' + (s.vguess ? ' <span class="wzt">밸브 모양으로 보임</span>' : '');
         const on = v => (s.vguess === v ? 'on' : '');
         body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브' + (s.vguess === 'gate' ? ' (플랜지형)' : ''), on('gate'))}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브')}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
+      } else if (q.phase === 'vsize') {
+        pts = [s._p];
+        const cur = npsAt(q.ri, q.si);
+        title = branchNote + `밸브 크기는 몇 인치인가요? (배관 ${nf(cur)})`;
+        body = `<div class="wzb">${btn('vs:' + cur, '배관과 같음 (' + nf(cur) + ')', s.vnps && +s.vnps !== cur ? '' : 'on')}${QS.filter(v => v < cur).reverse().map(v => btn('vs:' + v, nf(v), +s.vnps === v ? 'on' : '')).join('')}</div>
+        <p class="mut">도면 BOM이나 밸브 옆 크기 표시(예: 1/2")를 보고 고르세요. 밸브 앞뒤 플랜지도 이 크기로 들어갑니다.</p>`;
+      } else if (q.phase === 'rsize') {
+        pts = [s._p];
+        const cur = npsAt(q.ri, q.si);
+        title = branchNote + `레듀서로 보입니다. ${nf(cur)}에서 몇 인치로 바뀌나요?`;
+        const smaller = QS.filter(v => v < cur).reverse(), bigger = QS.filter(v => v > cur).slice(0, 3);
+        body = `<div class="wzb">${smaller.map((v, i) => btn('rs:' + v, nf(cur) + ' → ' + nf(v), i === 0 ? 'on' : '')).join('')}${bigger.map(v => btn('rs:' + v, nf(cur) + ' → ' + nf(v) + ' (커짐)', 'ghost')).join('')}</div>
+        <div class="wzb">${btn('rt:conc', '동심 (CONC)', (s.rt || 'conc') === 'conc' ? 'on' : 'ghost')}${btn('rt:ecc', '편심 (ECC)', s.rt === 'ecc' ? 'on' : 'ghost')}${btn('rs:none', '레듀서 아님', 'ghost')}</div>`;
       } else if (q.phase === 'branch') {
         pts = [s._p];
         title = branchNote + '여기서 배관이 갈라집니다. 갈라지는 쪽 배관 크기는?';
-        const cur = +r.nps || +R.nps || 4;
+        const cur = npsAt(q.ri, q.si);
         body = `<div class="wzb">${btn('br:' + cur, '같은 크기 (' + nf(cur) + ')', 'on')}${QS.filter(v => v < cur).reverse().map(v => btn('br:' + v, nf(v))).join('')}${btn('br:none', '갈라지는 곳 아님', 'ghost')}</div>`;
       } else if (q.phase === 'len') {
         pts = [prev, s._p]; mode = 'seg';
@@ -828,6 +848,12 @@ RULES
     else if (k === 'type') {
       if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
       else { if (v === 'flange') { s.t = 'flange'; delete s.vt; } else { s.t = 'valve'; s.vt = v; s.conn = 'flg'; } s.okType = true; wAdvance(); }
+    }
+    else if (k === 'vs') { s.vnps = +v; s.okVsize = true; wAdvance(); }
+    else if (k === 'rt') { W.hist.pop(); s.rt = v; wRender(); return; }
+    else if (k === 'rs') {
+      if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
+      else { s.nps2 = +v; s.rt = s.rt || 'conc'; s.okRed = true; wAdvance(); }
     }
     else if (k === 'br') {
       if (v === 'none') { // 티가 아니면: 이 티에서 시작한 갈라진 배관을 지움
