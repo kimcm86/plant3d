@@ -113,13 +113,22 @@
     let cand = merged.filter(l => l.len >= 6 && l.cov / l.len > 0.82); // 점선(기존 배관)은 빈틈이 많아 제외
     // 같은 축 같은 오프셋의 선 사이 틈(밸브·기호로 끊긴 곳) 잇기
     const bridged = [];
+    // 틈 사이를 다른 긴 선이 가로지르면(꺾임·티 자리) 잇지 않는다 — 같은 줄 위의 치수 보조선/라벨선이 배관에 붙는 것 방지
+    const crossGap = (l, g0, g1) => g1 - g0 > 2.5 && cand.some(m => {
+      if (m.ax === l.ax || m.len < 10) return false;
+      const xi = isect(l, m);
+      if (!xi || xi.sl < g0 - 1 || xi.sl > g1 + 1 || xi.sm < m.s0 - 1.5 || xi.sm > m.s1 + 1.5) return false;
+      const endsHere = Math.min(Math.abs(xi.sm - m.s0), Math.abs(xi.sm - m.s1)) < 1.5; // 틈 자리에서 끝나는 선 = 꺾임·티 배관
+      const welded = dots.some(d => { const s = d[0] * m.u[0] + d[1] * m.u[1], o = d[0] * m.n[0] + d[1] * m.n[1]; return Math.abs(o - m.off) < 1.2 && s > m.s0 - 3 && s < m.s1 + 3; });
+      return endsHere || welded;
+    });
     const gk = {};
     cand.forEach(l => { const k = l.ax + '|' + Math.round(l.off / 0.5); (gk[k] = gk[k] || []).push(l); });
     Object.values(gk).forEach(arr => {
       arr.sort((p, q) => p.s0 - q.s0);
       let cur = null;
       arr.forEach(l => {
-        if (cur && l.s0 - cur.s1 < 22) { cur.gaps.push([cur.s1, l.s0]); cur.s1 = Math.max(cur.s1, l.s1); }
+        if (cur && l.s0 - cur.s1 < 22 && !crossGap(cur, cur.s1, l.s0)) { cur.gaps.push([cur.s1, l.s0]); cur.s1 = Math.max(cur.s1, l.s1); }
         else { cur && bridged.push(cur); cur = Object.assign({}, l, { gaps: [] }); }
       });
       cur && bridged.push(cur);
@@ -137,13 +146,14 @@
       const et = [l.a, l.b].some(e => onL(m, e, 1.0));
       if (ee || et) adj[i].push(j);
     }
-    const nearEnd = (l, p) => { const s = p[0] * l.u[0] + p[1] * l.u[1], o = p[0] * l.n[0] + p[1] * l.n[1]; return Math.abs(o - l.off) < 1.2 && s > l.s0 - 3 && s < l.s1 + 3; };
+    const nearEnd = (l, p) => { const s = p[0] * l.u[0] + p[1] * l.u[1], o = p[0] * l.n[0] + p[1] * l.n[1]; return Math.abs(o - l.off) < 1.2 && s > l.s0 - 0.8 && s < l.s1 + 0.8; };
     const seed = bridged.map(l => l.len >= 8 && dots.some(d => nearEnd(l, d)));
     const keep = new Array(N).fill(false), st = [];
     seed.forEach((v, i) => { if (v) keep[i] = true; });
     for (let it = 0; it < 2; it++) bridged.forEach((l, i) => {
       if (keep[i]) return;
-      const okE = e => bridged.some((m, j) => keep[j] && m.ax !== l.ax && (onL(m, e, 3) || dist(e, m.a) < 3.5 || dist(e, m.b) < 3.5));
+      const dotAt = p => dots.some(d => dist(d, p) < 3.5);
+      const okE = e => bridged.some((m, j) => keep[j] && m.ax !== l.ax && (onL(m, e, 1.0) || [m.a, m.b].some(f => dist(e, f) < 1.2 || (dist(e, f) < 3.5 && dotAt(f)))));
       if (okE(l.a) && okE(l.b)) keep[i] = true;
     });
     // 작은 묶음(로고·기호 안의 선)은 제외: 연결된 배관 길이 합이 60pt 미만
@@ -204,7 +214,7 @@
       const cuts = [l.s0, l.s1];
       pipes.forEach(m => {
         if (m === l) return;
-        [m.a, m.b].forEach(e => { const s = e[0] * l.u[0] + e[1] * l.u[1], o = e[0] * l.n[0] + e[1] * l.n[1]; if (Math.abs(o - l.off) < 2.5 && s > l.s0 + 3 && s < l.s1 - 3) cuts.push(s); });
+        [m.a, m.b].forEach(e => { const s = e[0] * l.u[0] + e[1] * l.u[1], o = e[0] * l.n[0] + e[1] * l.n[1]; if (Math.abs(o - l.off) < 1.0 && s > l.s0 + 3 && s < l.s1 - 3) cuts.push(s); });
         if (m.ax !== l.ax) { // 교차점
           const den = l.u[0] * m.u[1] - l.u[1] * m.u[0]; if (Math.abs(den) < 1e-6) return;
           const pl = P(l, 0), pm = P(m, 0), t = ((pm[0] - pl[0]) * m.u[1] - (pm[1] - pl[1]) * m.u[0]) / den, X = [pl[0] + l.u[0] * t, pl[1] + l.u[1] * t];
@@ -221,11 +231,17 @@
         n0.edges.push(e); n1.edges.push(e);
       }
     });
+    nodes.forEach(n => {
+      if (n.edges.length < 3 || A.dots.some(d => dist(d, n.p) < 14)) return;
+      const ax = n.edges.map(e => e.l.ax), main = ax.find((a, i) => ax.indexOf(a) !== i);
+      const drop = n.edges.filter(e => main ? e.l.ax !== main : false);
+      drop.forEach(e => { [e.n0, e.n1].forEach(x => { x.edges = x.edges.filter(y => y !== e); }); });
+    });
     // 꺾임 너머로 튀어나온 짧은 끝(치수 보조선이 이어진 것) 잘라내기
     for (let it = 0; it < 3; it++) nodes.slice().forEach(n => {
       if (n.edges.length !== 1) return;
       const e = n.edges[0], o = e.n0 === n ? e.n1 : e.n0, len = e.s1 - e.s0;
-      if (len < 30 && !e.feats.length && o.edges.length >= 3) { o.edges = o.edges.filter(x => x !== e); n.edges = []; }
+      if (len < 30 && !e.feats.length && o.edges.length >= 3 && !A.dots.some(d => dist(d, n.p) < 3)) { o.edges = o.edges.filter(x => x !== e); n.edges = []; }
     });
     for (let i = nodes.length - 1; i >= 0; i--) if (!nodes[i].edges.length) nodes.splice(i, 1);
     const dirOf = (from, to) => { const v = [to[0] - from[0], to[1] - from[1]], L = Math.hypot(v[0], v[1]) || 1; let best = null, bv = -2; Object.entries(AX).forEach(([k, a]) => { const d = (v[0] * a[0] + v[1] * a[1]) / L; if (d > bv) { bv = d; best = k; } }); return best; };
