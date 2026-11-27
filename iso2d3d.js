@@ -723,13 +723,14 @@ RULES
     if (!O || !W || !W.ext._pg) return;
     const w0 = W, segs = w0.ext._pg.segs, page = w0.ext.page; w0.ocrRun = true;
     const say = t => { w0.ocrMsg = t; if (W !== w0) return; const el = $('wzocr'); if (el) el.textContent = t; };
+    const live = () => W === w0 && !$('iso').hidden && !!$('wzcv') && !!$('wzq0'); // 질문 화면이 지금 열려 있을 때만 다시 그림
     const banner = t => { const bn = document.querySelector('.wzocrb'); if (bn && W === w0) bn.textContent = t; };
     try {
       // 1) 똑바른 글자 → 표제란 (라인 번호·크기·장 번호)
       say('표제란 읽는 중…');
       const words = await O.readWords(segs, page); w0.words = words;
       const tt = await O.readTitle(segs, words); w0.title = tt;
-      if (W === w0 && W.q.phase === 'size') {
+      if (live() && W.q.phase === 'size') {
         const ln = $('wzln'); if (ln && ln.value) W.R.line_no = ln.value.trim();
         if (tt.line_no && !W.R.line_no) W.R.line_no = tt.line_no;
         wRender();
@@ -741,7 +742,7 @@ RULES
       if (W === w0) {
         O.assign(W.R, nums);
         const typing = $('wzd') && $('wzd').value;
-        if (!typing && W.q.phase !== 'size' && W.q.phase !== 'done') { W.q.phase = null; wFirstPhase(); wRender(); }
+        if (W.q.phase !== 'size' && W.q.phase !== 'done') { W.q.phase = null; wFirstPhase(); if (live() && !typing) wRender(); }
       }
       // 3) 도면 BOM 표
       try { w0.bom = await O.readBOM(segs, page, words, say); } catch (e) { w0.bom = null; }
@@ -749,7 +750,7 @@ RULES
       try { say('다른 장 표시·좌표 찾는 중…'); const iso = await O.readIsoText(segs, page, { vars: [[-30, -0.577], [30, 0.577], [-30, 0.577], [30, -0.577]], wl: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./()-+:=# ' }); w0.see = O.seeSheets(iso); w0.coords = O.coordsOf(iso); } catch (e) { w0.see = []; w0.coords = []; }
       w0.ocrRun = false;
       if (W !== w0) return;
-      if (W.q.phase === 'done') wRender();
+      if (W.q.phase === 'done') { if (live()) wRender(); }
       else banner('✓ 도면 치수 ' + nums.length + '개' + (w0.bom ? ', BOM ' + w0.bom.rows.length + '줄' : '') + '을 읽었습니다.');
     } catch (e) { w0.ocrRun = false; w0.ocrErr = e.message; say('자동 읽기를 못 했습니다 (' + e.message + '). 직접 입력해 주세요.'); }
   }
@@ -856,9 +857,10 @@ RULES
       const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
       if (q.phase === 'type') {
         pts = [s._p];
-        title = branchNote + '빨간 원 안의 표시는 무엇인가요?' + (s.vguess ? ' <span class="wzt">' + (s.vguess === 'check' ? '플랜지 ─ 체크 밸브 ─ 플랜지 모양으로 보임' : '밸브 모양으로 보임') + '</span>' : '');
-        const on = v => (s.vguess === v ? 'on' : '');
-        body = `<div class="wzb">${btn('type:flange', '플랜지 연결')}${btn('type:gate', '게이트 밸브' + (s.vguess === 'gate' ? ' (플랜지형)' : ''), on('gate'))}${btn('type:globe', '글로브 밸브')}${btn('type:check', '체크 밸브' + (s.vguess === 'check' ? ' (플랜지형)' : ''), on('check'))}${btn('type:ball', '볼 밸브')}${btn('type:butterfly', '버터플라이 밸브')}${btn('type:ctrl', '제어 밸브')}${btn('type:none', '아무것도 아님', 'ghost')}</div>`;
+        const lg = symGuess(q.ri, q.si, 'type'), gv = lg ? lg.v : s.vguess;
+        title = branchNote + '빨간 원 안의 표시는 무엇인가요?' + (lg ? ' <span class="wzt wzto">지난번 비슷한 모양을 "' + E(TYPEK[lg.v] || lg.v) + '"(으)로 고르셨습니다</span>' : s.vguess ? ' <span class="wzt">' + (s.vguess === 'check' ? '플랜지 ─ 체크 밸브 ─ 플랜지 모양으로 보임' : '밸브 모양으로 보임') + '</span>' : '');
+        const on = v => (gv === v ? 'on' : '');
+        body = `<div class="wzb">${btn('type:flange', '플랜지 연결', on('flange'))}${btn('type:gate', '게이트 밸브' + (s.vguess === 'gate' ? ' (플랜지형)' : ''), on('gate'))}${btn('type:globe', '글로브 밸브', on('globe'))}${btn('type:check', '체크 밸브' + (s.vguess === 'check' ? ' (플랜지형)' : ''), on('check'))}${btn('type:ball', '볼 밸브', on('ball'))}${btn('type:butterfly', '버터플라이 밸브', on('butterfly'))}${btn('type:ctrl', '제어 밸브', on('ctrl'))}${btn('type:none', '아무것도 아님', gv === 'none' ? 'on' : 'ghost')}</div>`;
       } else if (q.phase === 'vsize') {
         pts = [s._p];
         const cur = npsAt(q.ri, q.si);
@@ -886,17 +888,18 @@ RULES
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
-        const eg = { cap: '캡 모양(ㄷ)이 보입니다', flange: '밸브 바로 끝 — 플랜지로 계기·장치에 연결될 가능성' }[s.guess];
-        title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?' + (eg ? ' <span class="wzt">' + eg + '</span>' : '');
-        const eo = v => (s.guess === v ? 'on' : '');
-        body = `<div class="wzb">${btn('end:open', '기존 배관에 연결 / 용접')}${btn('end:cap', '캡', eo('cap'))}${btn('end:blind', '블라인드 플랜지')}${btn('end:flange', '플랜지 (열림)', eo('flange'))}${btn('end:pump', '펌프')}${btn('end:vessel', '베셀·탑')}${btn('end:drum', '드럼')}${btn('end:hx', '열교환기')}</div><div class="row wzs"><label>장치 번호 (장치일 때) <input id="wztag" placeholder="예: P-101A"></label></div>`;
+        const le = symGuess(q.ri, q.si, 'end'), ge = le ? le.v : s.guess;
+        const eg = le ? '지난번 비슷한 모양을 "' + (ENDK[le.v] || le.v) + '"(으)로 고르셨습니다' : { cap: '캡 모양(ㄷ)이 보입니다', flange: '밸브 바로 끝 — 플랜지로 계기·장치에 연결될 가능성' }[s.guess];
+        title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?' + (eg ? ' <span class="wzt' + (le ? ' wzto' : '') + '">' + E(eg) + '</span>' : '');
+        const eo = v => (ge === v ? 'on' : '');
+        body = `<div class="wzb">${btn('end:open', '기존 배관에 연결 / 용접', eo('open'))}${btn('end:cap', '캡', eo('cap'))}${btn('end:blind', '블라인드 플랜지', eo('blind'))}${btn('end:flange', '플랜지 (열림)', eo('flange'))}${btn('end:pump', '펌프', eo('pump'))}${btn('end:vessel', '베셀·탑', eo('vessel'))}${btn('end:drum', '드럼', eo('drum'))}${btn('end:hx', '열교환기', eo('hx'))}</div><div class="row wzs"><label>장치 번호 (장치일 때) <input id="wztag" placeholder="예: P-101A"></label></div>`;
       }
     }
     const pct = Math.round(idx / total * 100);
     P.ov('3D로 바꾸기 — ' + W.f.name, `<div class="wz">
  <div class="wzhd"><div class="wzbar"><i style="width:${q.phase === 'done' ? 100 : pct}%"></i></div><span class="mut">${q.phase === 'done' ? '완료' : idx + ' / ' + total}</span></div>
  <div class="wzmain"><canvas id="wzcv" width="1100" height="560"></canvas><canvas id="wzmini" width="220" height="150"></canvas></div>
- <h3 class="wzq">${title}</h3>${W.ocrRun ? `<p class="wzocrb">⏳ <span id="wzocr">${E(W.ocrMsg || '도면 치수 읽는 중…')}</span> — 다 읽으면 길이가 자동으로 채워집니다.</p>` : ''}${body}
+ <h3 class="wzq" id="wzq0">${title}</h3>${W.ocrRun ? `<p class="wzocrb">⏳ <span id="wzocr">${E(W.ocrMsg || '도면 치수 읽는 중…')}</span> — 다 읽으면 길이가 자동으로 채워집니다.</p>` : ''}${body}
  <div class="row wzft"><button data-wz="back"${W.hist.length ? '' : ' disabled'}>← 이전</button><span style="flex:1"></span><button data-att="back">그만두기</button><button data-wz="adv" class="ghost">고급 편집</button></div>
  <div id="wzmsg" class="mut"></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
@@ -939,6 +942,62 @@ RULES
         const sp = inp.closest('tr').querySelector('.wzsrc'), src = SRC[s.auto]; sp.className = 'wzsrc ' + src[1]; sp.textContent = src[0];
       };
     });
+  }
+  /* ---------- ⑤ 기호 학습: 고른 답을 기호 모양과 함께 기억 → 다음에 비슷한 모양이면 미리 골라 둠 ---------- */
+  const TYPEK = { flange: '플랜지 연결', gate: '게이트 밸브', globe: '글로브 밸브', check: '체크 밸브', ball: '볼 밸브', butterfly: '버터플라이 밸브', ctrl: '제어 밸브', none: '아무것도 아님' };
+  const ENDK = { open: '기존 배관에 연결', cap: '캡', blind: '블라인드 플랜지', flange: '플랜지 (열림)', pump: '펌프', vessel: '베셀·탑', drum: '드럼', hx: '열교환기' };
+  const SYMK = 'p3d_sym';
+  const symLoad = () => { try { return JSON.parse(localStorage.getItem(SYMK) || '[]'); } catch (e) { return []; } };
+  function symSig(ri, si) {
+    if (!W.ext || !W.ext._pg) return null;
+    const r = W.R.runs[ri], st = r && r.steps[si]; if (!st || !st._p) return null;
+    const p = st._p, prev = si === 0 ? r._p0 : r.steps[si - 1]._p; if (!prev) return null;
+    let ax = [p[0] - prev[0], p[1] - prev[1]]; const L = Math.hypot(ax[0], ax[1]) || 1; ax = [ax[0] / L, ax[1] / L];
+    const R = 13, H = new Array(8).fill(0); let tot = 0, nf = 0, ex = [0, 0];
+    W.ext._pg.segs.forEach(q => {
+      const [a, b] = q, m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], v = [m[0] - p[0], m[1] - p[1]];
+      if (Math.hypot(v[0], v[1]) > R) return;
+      if (q.isFill) { nf++; return; }
+      const d = [b[0] - a[0], b[1] - a[1]], l = Math.hypot(d[0], d[1]); if (l < 0.8 || l > 25) return;
+      const along = Math.abs(d[0] * ax[0] + d[1] * ax[1]) / l; if (along > 0.97 && l > 10) return; // 배관 선 자체는 뺌
+      let ang = Math.atan2(d[0] * ax[1] - d[1] * ax[0], d[0] * ax[0] + d[1] * ax[1]) * 180 / Math.PI; ang = ((ang % 180) + 180) % 180;
+      H[Math.min(7, Math.floor(ang / 22.5))] += l; tot += l;
+      ex[0] = Math.max(ex[0], Math.abs(v[0] * ax[0] + v[1] * ax[1])); ex[1] = Math.max(ex[1], Math.abs(v[0] * -ax[1] + v[1] * ax[0]));
+    });
+    if (tot < 3) return null;
+    return { h: H.map(x => Math.round(x / tot * 1000) / 1000), t: Math.round(tot * 10) / 10, f: Math.min(nf, 20), e: ex.map(x => Math.round(x * 10) / 10) };
+  }
+  function symDist(a, b) { let d = 0; for (let i = 0; i < 8; i++) d += Math.abs(a.h[i] - b.h[i]); return d + Math.abs(Math.log((a.t + 1) / (b.t + 1))) * 0.6 + Math.abs(a.f - b.f) * 0.03 + (Math.abs(a.e[0] - b.e[0]) + Math.abs(a.e[1] - b.e[1])) * 0.02; }
+  function symGuess(ri, si, kind) {
+    const st = W.R.runs[ri].steps[si]; if (!st._sig) st._sig = symSig(ri, si) || 0; if (!st._sig) return null;
+    let best = null; symLoad().forEach(m => { if (m.k !== kind) return; const d = symDist(st._sig, m.s); if (d < 0.32 && (!best || d < best.d)) best = { d, v: m.v }; });
+    return best;
+  }
+  function symLearn(ri, si, kind, v) {
+    try {
+      const st = W.R.runs[ri].steps[si]; const sg = st._sig || symSig(ri, si); if (!sg) return;
+      let L = symLoad().filter(m => !(m.k === kind && symDist(m.s, sg) < 0.08)); // 같은 모양은 새 답으로 바꿈
+      L.push({ k: kind, v, s: sg, t: Date.now() }); if (L.length > 400) L = L.slice(-400);
+      localStorage.setItem(SYMK, JSON.stringify(L));
+    } catch (e) { }
+  }
+  /* ---------- ⑫ 원본 도면 ↔ 다시 만든 ISO 나란히 ---------- */
+  function wCompare() {
+    if (!W.built || !W.built.length) return;
+    P.showIso(W.built[0]);
+    const sv = document.querySelector('#isob svg'), svg = sv ? sv.outerHTML : '<p class="mut">ISO를 만들지 못했습니다.</p>';
+    const img = W.big.toDataURL('image/png');
+    const cnt = { elbow: 0, tee: 0, valve: 0, reducer: 0, flange: 0, end: 0 }, len = { d: 0 };
+    W.R.runs.forEach(r => r.steps.forEach(x => { if (x.t === 'tee_in') cnt.tee++; else if (cnt[x.t] != null) cnt[x.t]++; }));
+    const it = P.bom(W.built), q = re => it.filter(x => re.test(x.code)).reduce((a, x) => a + x.q, 0);
+    const pipeM = Math.round(q(/^PIPE$/) * 100) / 100;
+    const rows = [['엘보', cnt.elbow, q(/^ELBOW/)], ['티', cnt.tee, q(/^TEE/)], ['밸브', cnt.valve, q(/V\/V$/)], ['레듀서', cnt.reducer, q(/^REDUCER/)], ['플랜지 (낱개)', '—', q(/FLANGE/)]];
+    P.ov('원본 ↔ 다시 만든 ISO — ' + W.f.name, `<div class="wzcmp"><div class="row wzft" style="margin:0 0 8px;border:0;padding:0"><button data-wz="cmpback">← 결과 화면</button><button data-wz="cmpiso">ISO 화면에서 고치기·인쇄</button><span class="mut">그림을 누르면 크게 봅니다</span></div>
+<div class="cmpg"><figure><figcaption>원본 도면 (PDF)</figcaption><img src="${img}" alt="원본"></figure><figure><figcaption>3D에서 다시 만든 ISO</figcaption>${svg}</figure></div>
+<div class="wzrev" style="max-width:640px"><table><thead><tr><th>항목</th><th>원본에서 읽은 경로</th><th>다시 만든 ISO</th></tr></thead><tbody>${rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b}</td><td>${c}${b !== '—' && b !== c ? ' <span class="wzsrc bad">다름</span>' : ''}</td></tr>`).join('')}<tr><td>배관 길이</td><td>—</td><td>${pipeM} m</td></tr></tbody></table></div>
+${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 "도면 BOM ↔ 3D 자재" 표에 있습니다.</p>' : ''}</div>`);
+    $('iso3').hidden = true; $('isop').hidden = true;
+    document.querySelectorAll('.cmpg figure').forEach(f => f.onclick = () => f.classList.toggle('big'));
   }
   const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   // 시작점 고르기: 초록 원(배관 끝)을 누르거나 빨간 원을 끌어다 놓으면 그 끝에서 다시 시작
@@ -984,6 +1043,7 @@ RULES
     }
     wSnap();
     const [k, v] = a.split(':');
+    if ((k === 'type' || k === 'end') && s) symLearn(q.ri, q.si, k, v);
     if (k === 'size') { W.sizeAns = true; R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
     else if (k === 'type') {
       if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
@@ -1158,7 +1218,7 @@ RULES
     const ids = made.filter(o => !o.ex).map(o => o.id);
     P.ov('3D로 바꾸기 — 완료', `<div class="wz"><h3 class="wzq">3D를 만들었습니다 (부품 ${b.objs.length}개).</h3>
 ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 있습니다 (예: 앞 부품과 길이가 겹침). 3D를 보고 이상하면 "이전 단계로" 돌아가 길이를 고치거나, 고급 편집에서 확인하세요.</p>` : ''}
-<div class="wzb"><button data-wz="see3d" class="pri big">3D로 보기</button><button data-wz="seeiso" class="big">ISO로 원본과 비교</button></div>
+<div class="wzb"><button data-wz="see3d" class="pri big">3D로 보기</button><button data-wz="seeiso" class="big">원본 ↔ 다시 만든 ISO 나란히</button></div>
 <div id="wzjoin"></div><div id="wzbom"></div>
 <div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button><span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
@@ -1171,7 +1231,9 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
     const b = e.target.closest('[data-wz]'); if (!b || !W) return;
     const a = b.dataset.wz;
     if (a === 'see3d') { P.focus(P.getObjs().filter(o => o.src === W.src).map(o => o.id)); return; }
-    if (a === 'seeiso') { if (W.built && W.built.length) P.showIso(W.built[0]); return; }
+    if (a === 'seeiso') { wCompare(); return; }
+    if (a === 'cmpback') { wBuild(); return; }
+    if (a === 'cmpiso') { if (W.built && W.built.length) P.showIso(W.built[0]); return; }
     if (a === 'again') { W.q = { ri: 0, si: 0, phase: 'done' }; wRender(); return; }
     if (a === 'join' || a === 'xyz') { wPlace(a); return; }
     wAnswer(a);
@@ -1184,6 +1246,8 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 .wzb{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.wzb button{font-size:17px;padding:10px 16px;border-radius:8px;min-width:90px}.wzb button.on{outline:3px solid #0f766e}.wz button.big{font-size:18px;padding:12px 22px}.wz button.ghost{background:#f8fafc;color:#475569}.wzno{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px}.wzno span{font-size:14px;color:#9a3412}.wzno button{font-size:15px;padding:7px 12px}.wz button.warn{background:#fff;color:#b91c1c;border-color:#fca5a5}
 .wzrev{max-height:300px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;margin:6px 0 10px}.wzrev table{width:100%;border-collapse:collapse;font-size:15px}.wzrev th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:6px 8px}.wzrev td{padding:4px 8px;border-top:1px solid #f1f5f9}.wzrev tr[data-wzrow]{cursor:pointer}.wzrev tr.on td{background:#e0f2fe}.wzrev input{width:90px;font-size:15px;padding:3px 6px}
 #wzbom .wzrev{max-height:none}.wzraw{margin:6px 0 12px}.wzraw summary{cursor:pointer;color:#0f766e;font-size:15px}.wzraw select{font-size:14px}
+.cmpg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}.cmpg figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;background:#fff;overflow:hidden;cursor:zoom-in}.cmpg figure.big{grid-column:1/-1;cursor:zoom-out}.cmpg figcaption{font-size:14px;font-weight:600;padding:6px 10px;background:#f1f5f9}.cmpg img,.cmpg svg{display:block;width:100%;height:auto;border:0!important}
+@media(max-width:800px){.cmpg{grid-template-columns:1fr}}
 .wzocrb{background:#fff7ed;border:1px dashed #fdba74;border-radius:6px;padding:5px 10px;font-size:14px;color:#9a3412;margin:0 0 6px}.wzsrc{display:inline-block;border-radius:4px;padding:1px 8px;font-size:13px}.wzsrc.ok{background:#dcfce7;color:#166534}.wzsrc.fit{background:#e0f2fe;color:#075985}.wzsrc.us{background:#f1f5f9;color:#334155}.wzsrc.bad{background:#fee2e2;color:#991b1b}.wzt.wzto{background:#ffedd5;color:#9a3412}
 .wzs{gap:12px;flex-wrap:wrap;margin:8px 0}.wzs input{font-size:16px;padding:6px}.wzft{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:10px}
 @media(max-width:700px){#wzmini{display:none}.wzq{font-size:17px}}`;
