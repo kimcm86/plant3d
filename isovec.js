@@ -107,18 +107,24 @@
     const dimL = merged.filter(l => l.dim);
     merged.forEach(l => {
       if (l.dim) return;
-      if (dimL.some(d => d.ax !== l.ax && ([l.a, l.b].some(p => onLine(d, p, 1.5) != null)))) l.ext = true;
+      if (dimL.some(d => { if (d.ax === l.ax) return false; if ([l.a, l.b].some(p => onLine(d, p, 1.5) != null)) return true;
+        const xi = isect(l, d); return xi && xi.sm > d.s0 - 2 && xi.sm < d.s1 + 2 && (Math.abs(xi.sl - l.s0) < 5 || Math.abs(xi.sl - l.s1) < 5); })) l.ext = true; // 보조선 끝이 치수선을 살짝 넘어가도 보조선
     });
     // 배관 후보: 길이 6pt 이상, 치수/보조선 아님
-    let cand = merged.filter(l => l.len >= 6 && l.cov / l.len > 0.82); // 점선(기존 배관)은 빈틈이 많아 제외
+    const onSeg = (l, d, tol) => { const s = d[0] * l.u[0] + d[1] * l.u[1], o = d[0] * l.n[0] + d[1] * l.n[1]; return Math.abs(o - l.off) < tol && s > l.s0 - 1 && s < l.s1 + 1; };
+    const longL = merged.filter(m => m.len >= 15 && m.cov / m.len > 0.82);
+    // 자기 용접점: 다른 선과 엇갈리는 자리가 아닌 곳의 용접점 (플랜지 면 획이 보조선과 이어져 배관을 가로지를 때 구별)
+    const dotMid = l => dots.some(d => onSeg(l, d, 1.2) && !longL.some(m => m !== l && m.ax !== l.ax && !(m.dim || m.ext) && onSeg(m, d, 2)));
+    // 화살촉 달린 치수선, 치수선에 닿는 보조선은 배관 후보에서 뺀다 (선 가운데에 용접점이 있으면 배관으로 봄)
+    let cand = merged.filter(l => l.len >= 6 && l.cov / l.len > 0.82 && !((l.dim || l.ext) && !dotMid(l))); // 점선(기존 배관)은 빈틈이 많아 제외
     // 같은 축 같은 오프셋의 선 사이 틈(밸브·기호로 끊긴 곳) 잇기
     const bridged = [];
     // 틈 사이를 다른 긴 선이 가로지르면(꺾임·티 자리) 잇지 않는다 — 같은 줄 위의 치수 보조선/라벨선이 배관에 붙는 것 방지
     const crossGap = (l, g0, g1) => g1 - g0 > 2.5 && cand.some(m => {
       if (m.ax === l.ax || m.len < 10) return false;
       const xi = isect(l, m);
-      if (!xi || xi.sl < g0 - 1 || xi.sl > g1 + 1 || xi.sm < m.s0 - 1.5 || xi.sm > m.s1 + 1.5) return false;
-      const endsHere = Math.min(Math.abs(xi.sm - m.s0), Math.abs(xi.sm - m.s1)) < 1.5; // 틈 자리에서 끝나는 선 = 꺾임·티 배관
+      if (!xi || xi.sl < g0 - 3 || xi.sl > g1 + 3 || xi.sm < m.s0 - 3 || xi.sm > m.s1 + 3) return false;
+      const endsHere = Math.min(Math.abs(xi.sm - m.s0), Math.abs(xi.sm - m.s1)) < 3; // 틈 자리에서 끝나는 선 = 꺾임·티 배관
       return endsHere;
     });
     const gk = {};
@@ -142,7 +148,7 @@
       }
       // 2) 빈 틈으로 3조각 이상 이어지는 줄 = 점선/일점쇄선(기존 배관·중심선) → 배관 후보에서 뺌
       let i0 = 0;
-      for (let i = 0; i <= link.length; i++) if (i === link.length || link[i] !== 'empty') { if (i - i0 + 1 >= 3) for (let k = i0; k <= i; k++) arr[k].dashed = true; i0 = i + 1; }
+      for (let i = 0; i <= link.length; i++) if (i === link.length || link[i] !== 'empty') { if (i - i0 + 1 >= 3) { const ch = arr.slice(i0, i + 1), mx = Math.max(...ch.map(l => l.len)), md = ch.map(l => l.len).sort((x, y) => x - y)[ch.length >> 1]; if (md < 30 && mx < 60) ch.forEach(l => { l.dashed = true; }); } i0 = i + 1; }
       let cur = null;
       arr.forEach((l, i) => {
         if (l.dashed) { cur && bridged.push(cur); cur = null; return; }
@@ -166,11 +172,13 @@
       if (ee || et) adj[i].push(j);
     }
     const nearEnd = (l, p) => { const s = p[0] * l.u[0] + p[1] * l.u[1], o = p[0] * l.n[0] + p[1] * l.n[1]; return Math.abs(o - l.off) < 1.2 && s > l.s0 - 0.8 && s < l.s1 + 0.8; };
-    const seed = bridged.map(l => l.len >= 8 && dots.some(d => nearEnd(l, d)));
+    // 배관을 가로질러 양쪽으로 튀어나온 짧은 획 = 플랜지 면·밸브 기호 (배관 아님)
+    const straddle = l => l.len < 20 && bridged.some(m => { if (m.ax === l.ax || m.len < 15) return false; const xi = isect(l, m); return xi && xi.sm > m.s0 + 1 && xi.sm < m.s1 - 1 && xi.sl - l.s0 > 2 && l.s1 - xi.sl > 2; });
+    const seed = bridged.map(l => l.len >= 8 && dots.some(d => nearEnd(l, d)) && !straddle(l));
     const keep = new Array(N).fill(false), st = [];
     seed.forEach((v, i) => { if (v) keep[i] = true; });
     for (let it = 0; it < 2; it++) bridged.forEach((l, i) => {
-      if (keep[i]) return;
+      if (keep[i] || straddle(l)) return;
       const dotAt = p => dots.some(d => dist(d, p) < 3.5);
       const okE = e => bridged.some((m, j) => keep[j] && m.ax !== l.ax && (onL(m, e, 1.0) || [m.a, m.b].some(f => dist(e, f) < 1.2 || (dist(e, f) < 3.5 && dotAt(f)))));
       if (okE(l.a) && okE(l.b)) keep[i] = true;
