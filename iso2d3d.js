@@ -160,6 +160,7 @@ RULES
       base = { ln: r.line_no || LN };
       if (r.existing) base.ex = true;
       const st = { cen: P0.slice(), cur: P0.slice(), dir, nps };
+      r._c0 = P0.slice(); r._d0 = dir; r._nps0 = nps; // 3D 위치 기록 (장 잇기·좌표 맞춤용)
       if (s.equip || s.nozzle) {
         if (s.equip) placeEquip(s.equip, P0, dir, nps, ri, -1);
         const f = mk('flange', { pos: R1(add3(P0, dir, P.HGx(+R.cls || 150, 'RF', nps))), axis: dir, nps, kind: 'wn', face: 'RF' });
@@ -185,6 +186,7 @@ RULES
         const n0 = out.length;
         if (ended) { errs.push({ ri, si, msg: '끝 다음에 있는 항목은 무시됨' }); return; }
         const D = +p.d || 0, d = st.dir, C = add3(st.cen, d, D);
+        p._c = C; p._din = d; p._nps = st.nps;
         switch (p.t) {
           case 'elbow': {
             if (!DIRS.includes(p.to) || !perp(d, p.to)) { errs.push({ ri, si, msg: '꺾이는 방향이 현재 방향과 직각이 아님' }); return; }
@@ -717,20 +719,39 @@ RULES
     }));
   }
   async function wOcr() {
-    if (!window.P3DOCR || !W || !W.ext._pg) return;
-    const w0 = W; w0.ocrRun = true;
-    const say = t => { if (W !== w0) return; const el = $('wzocr'); if (el) el.textContent = t; };
+    const O = window.P3DOCR;
+    if (!O || !W || !W.ext._pg) return;
+    const w0 = W, segs = w0.ext._pg.segs, page = w0.ext.page; w0.ocrRun = true;
+    const say = t => { w0.ocrMsg = t; if (W !== w0) return; const el = $('wzocr'); if (el) el.textContent = t; };
+    const banner = t => { const bn = document.querySelector('.wzocrb'); if (bn && W === w0) bn.textContent = t; };
     try {
+      // 1) 똑바른 글자 → 표제란 (라인 번호·크기·장 번호)
+      say('표제란 읽는 중…');
+      const words = await O.readWords(segs, page); w0.words = words;
+      const tt = await O.readTitle(segs, words); w0.title = tt;
+      if (W === w0 && W.q.phase === 'size') {
+        const ln = $('wzln'); if (ln && ln.value) W.R.line_no = ln.value.trim();
+        if (tt.line_no && !W.R.line_no) W.R.line_no = tt.line_no;
+        wRender();
+      }
+      // 2) 치수 숫자
       const near = (w0.ext.pipes || []).map(l => [l.a, l.b]);
-      const nums = await window.P3DOCR.readNumbers(w0.ext._pg.segs, w0.ext.page, { near, progress: t => { w0.ocrMsg = t; say(t); } });
-      w0.nums = nums; w0.ocrRun = false;
+      const nums = await O.readNumbers(segs, page, { near, progress: say });
+      w0.nums = nums;
+      if (W === w0) {
+        O.assign(W.R, nums);
+        const typing = $('wzd') && $('wzd').value;
+        if (!typing && W.q.phase !== 'size' && W.q.phase !== 'done') { W.q.phase = null; wFirstPhase(); wRender(); }
+      }
+      // 3) 도면 BOM 표
+      try { w0.bom = await O.readBOM(segs, page, words, say); } catch (e) { w0.bom = null; }
+      // 4) 아이소 방향 글자: 다른 장 표시(SEE DWG SHT 2/3)·좌표(E/N/EL) — 힌트로만 사용
+      try { say('다른 장 표시·좌표 찾는 중…'); const iso = await O.readIsoText(segs, page, { vars: [[-30, -0.577], [30, 0.577], [-30, 0.577], [30, -0.577]], wl: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./()-+:=# ' }); w0.see = O.seeSheets(iso); w0.coords = O.coordsOf(iso); } catch (e) { w0.see = []; w0.coords = []; }
+      w0.ocrRun = false;
       if (W !== w0) return;
-      window.P3DOCR.assign(W.R, nums);
-      const typing = $('wzd') && $('wzd').value;
-      if (!typing && W.q.phase !== 'size' && W.q.phase !== 'done') { W.q.phase = null; wFirstPhase(); wRender(); }
-      else if (W.q.phase === 'done') wRender();
-      else { const bn = document.querySelector('.wzocrb'); if (bn) bn.textContent = '✓ 도면 치수 ' + nums.length + '개를 읽었습니다. 길이 질문에 미리 채워 둡니다.'; }
-    } catch (e) { w0.ocrRun = false; w0.ocrErr = e.message; say('치수 자동 읽기를 못 했습니다 (' + e.message + '). 직접 입력해 주세요.'); }
+      if (W.q.phase === 'done') wRender();
+      else banner('✓ 도면 치수 ' + nums.length + '개' + (w0.bom ? ', BOM ' + w0.bom.rows.length + '줄' : '') + '을 읽었습니다.');
+    } catch (e) { w0.ocrRun = false; w0.ocrErr = e.message; say('자동 읽기를 못 했습니다 (' + e.message + '). 직접 입력해 주세요.'); }
   }
   function wFirstPhase() {
     if (W.q.phase !== 'size') ocrApply();
@@ -820,7 +841,9 @@ RULES
     if (q.phase === 'size') {
       { const r0 = R.runs[0], s0 = r0.steps[0]; pts = s0 && s0._p ? [r0._p0, s0._p] : [r0._p0]; if (pts.length > 1) mode = 'seg'; }
       title = '빨간 원에서 배관이 시작합니다 (파란 띠 = 첫 구간). 맞으면 배관 크기를 고르세요.<br><span class="wzt">틀리면 도면에서 초록 원(배관 끝) 중 진짜 시작점을 누르거나, 빨간 원을 끌어다 놓으세요</span>';
-      body = `<div class="wzb">${QS.map(v => btn('size:' + v, nf(v), (+R.nps === v ? 'on' : ''))).join('')}</div>
+      const hint = !W.sizeAns && W.title && W.title.nps;
+      if (hint) title += `<br><span class="wzt wzto">표제란 라인 번호 ${E(W.title.line_no)} → ${nf(hint)} 로 보입니다</span>`;
+      body = `<div class="wzb">${QS.map(v => btn('size:' + v, nf(v), ((hint ? hint === v : +R.nps === v) ? 'on' : ''))).join('')}</div>
         <div class="row wzs"><label>라인 번호 (선택) <input id="wzln" value="${E(R.line_no || '')}" placeholder="예: SW06002-4&quot;-B01A"></label><label>압력 등급 <select id="wzcls">${opt([150, 300, 400, 600, 900, 1500, 2500].map(v => [v, v + '#']), R.cls || 150)}</select></label><label>2" 이하 이음 <select id="wzce">${opt([['sw', 'SW 소켓 용접'], ['bw', 'BW 맞대기'], ['thd', '나사 (THD)']], R.ce || 'sw')}</select></label></div>
         <div class="wzno"><span>시작점이 틀렸나요?</span>${btn('notpipe', '✕ 파란 띠는 배관이 아님 (점선·치수선 등)', 'warn')}${(R.nStarts || 1) > 1 ? btn('nextstart', '↻ 다른 끝에서 시작 (' + ((R.startIdx || 0) + 1) + ' / ' + R.nStarts + ')', 'ghost') : ''}</div>`;
     } else if (q.phase === 'done') {
@@ -961,7 +984,7 @@ RULES
     }
     wSnap();
     const [k, v] = a.split(':');
-    if (k === 'size') { R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
+    if (k === 'size') { W.sizeAns = true; R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
     else if (k === 'type') {
       if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
       else { if (v === 'flange') { s.t = 'flange'; delete s.vt; } else { s.t = 'valve'; s.vt = v; s.conn = 'flg'; } s.okType = true; wAdvance(); }
@@ -990,18 +1013,159 @@ RULES
     }
     wRender();
   }
-  function wBuild() {
+  function wJoinUI() {
+    const el = $('wzjoin'); if (!el) return;
+    const tt = W.title || {}, sh = W.f.sheet || {};
+    let h = '';
+    const info = (sh.ln ? '라인 <b>' + E(sh.ln) + '</b>' : '라인 번호 없음') + (sh.sht ? ' · ' + sh.sht + '/' + (sh.of || '?') + '장' : '');
+    if (W.placed && W.placed.kind === 'join') h += `<p>🔗 ${info} — <b>${E(W.placed.lab)}</b>에 이 장의 ${E(W.placed.e)} 쪽을 맞춰 이어 붙였습니다.</p>`;
+    else if (W.placed && W.placed.kind === 'xyz') h += `<p>📍 ${info} — ${E(W.placed.lab)} 를 실제 좌표 E ${W.placed.E} · N ${W.placed.N} · EL ${W.placed.EL} 에 놓았습니다.</p>`;
+    else if (W.cands && W.cands.length) h += `<p>🔗 ${info} — 같은 라인의 다른 장이 있습니다. 아래에서 이을 곳을 고르세요.</p>`;
+    else if (sh.of > 1) h += `<p class="mut">🔗 ${info} — 같은 라인의 다른 장을 3D로 만들면 끝끼리 자동으로 이어 붙입니다 (방향·크기가 맞는 끝).</p>`;
+    if (W.cands && W.cands.length) h += `<div class="row wzs"><label>이어 붙일 곳 <select id="wzjsel">${opt([[-1, '잇지 않음 (따로 둠)']].concat(W.cands.slice(0, 12).map((c, i) => [i, '이 장 ' + c.e.lab + ' → ' + c.lab])), W.placed && W.placed.kind === 'join' ? W.placed.i : -1)}</select></label><button data-wz="join">적용</button></div>`;
+    // 좌표 맞춤
+    const nodes = nodesOf(W.R), co = (W.coords || [])[0];
+    let pre = null;
+    if (co) { let best = null, bd = 120; nodes.forEach(n => { const d = Math.hypot(n.p[0] - co.p[0], n.p[1] - co.p[1]); if (d < bd) { bd = d; best = n; } }); if (best) pre = { n: best, co }; }
+    const xv = W.placed && W.placed.kind === 'xyz' ? W.placed : pre ? { id: pre.n.id, E: pre.co.e ?? '', N: pre.co.n ?? '', EL: pre.co.el ?? '' } : { id: nodes[0] && nodes[0].id, E: '', N: '', EL: '' };
+    h += `<details class="wzraw"${pre || (W.placed && W.placed.kind === 'xyz') ? ' open' : ''}><summary>📍 실제 좌표(E·N·EL)에 놓기${pre ? ' — 도면에서 좌표를 읽었습니다: ' + E(pre.co.t) : ''}</summary>
+<div class="row wzs"><label>기준점 <select id="wzxn">${opt(nodes.map(n => [n.id, n.lab]), xv.id)}</select></label><label>E (mm) <input id="wzxe" type="number" value="${xv.E}" style="width:110px"></label><label>N (mm) <input id="wzxnn" type="number" value="${xv.N}" style="width:110px"></label><label>EL (mm) <input id="wzxel" type="number" value="${xv.EL}" style="width:110px"></label><button data-wz="xyz">좌표에 놓기</button></div>
+<p class="mut">좌표가 있는 장끼리는 따로 잇지 않아도 제자리에 맞춰집니다. E는 동쪽(+X), N은 북쪽, EL은 높이입니다.</p></details>`;
+    el.innerHTML = h;
+  }
+  async function wPlace(a) {
+    const say = t => { const m = $('wzjoin'); if (m) m.insertAdjacentHTML('beforeend', '<p class="wzocrb">' + E(t) + '</p>'); };
+    if (a === 'join') {
+      const i = +$('wzjsel').value;
+      if (i < 0) { W.shift = null; W.placed = null; }
+      else { const c = W.cands[i]; W.shift = c.shift; W.placed = { kind: 'join', lab: c.lab, e: c.e.lab, i }; }
+    } else {
+      const n = nodesOf(W.R).find(x => x.id === $('wzxn').value), E1 = +$('wzxe').value, N1 = +$('wzxnn').value, EL = +$('wzxel').value;
+      if (!n || ![$('wzxe').value, $('wzxnn').value, $('wzxel').value].every(v => v !== '' && isFinite(+v))) return say('E·N·EL 세 값을 모두 넣어 주세요.');
+      const tgt = [E1, EL, -N1]; W.shift = [0, 1, 2].map(i => Math.round((tgt[i] - n.c[i]) * 10) / 10); W.placed = { kind: 'xyz', lab: n.lab, id: n.id, E: E1, N: N1, EL };
+    }
+    await wBuild();
+  }
+  // 도면 BOM ↔ 3D 자재 비교
+  const CATK = { PIPE: '배관', ELBOW: '엘보', TEE: '티', REDUCER: '레듀서', CAP: '캡', FLANGE: '플랜지', 'BLIND FLANGE': '블라인드 플랜지', GASKET: '가스켓', 'STUD/BOLT': '스터드 볼트', 'GATE V/V': '게이트 밸브', 'GLOBE V/V': '글로브 밸브', 'CHECK V/V': '체크 밸브', 'BALL V/V': '볼 밸브', 'BFLY V/V': '버터플라이 밸브', 'PLUG V/V': '플러그 밸브', 'CONTROL V/V': '제어 밸브', VALVE: '밸브', NIPPLE: '니플', 'SWAGE NIPPLE': '스웨지 니플', COUPLING: '커플링', STRAINER: '스트레이너', UNION: '유니언', OLET: '올렛' };
+  function bomCompare(bom, items) {
+    const O = window.P3DOCR, rows = {}, key = (c, z, z2) => c + '|' + (z == null ? '?' : z) + (z2 ? 'x' + z2 : '');
+    const put = (c, z, z2, side, q) => { if (!c) return; const k = key(c, z, z2); const r = rows[k] = rows[k] || { c, z, z2, d: 0, m: 0, dn: 0 }; if (side === 'd' && (q == null || isNaN(q))) r.nq = 1; else r[side] += q || 0; if (side === 'd') r.dn++; };
+    bom.rows.forEach(r => put(r.cat, r.size, r.cat === 'REDUCER' ? r.size2 : null, 'd', r.qty == null ? NaN : r.qty));
+    (items || []).forEach(it => {
+      if (it.code === 'PIPE SUPPORT') return;
+      let c = /STRAINER/.test(it.code) ? 'STRAINER' : O.catOf(it.code); if (!c) return;
+      const sz = String(it.size || ''), parts = sz.split('X');
+      let z = O.sizeNum(parts[0]), z2 = null;
+      if (c === 'REDUCER' && parts[1]) z2 = O.sizeNum(parts[1]);
+      if (c === 'TEE') z2 = null;
+      put(c, z, z2, 'm', it.q);
+    });
+    // 도면에 '밸브'로만 읽힌 줄은 같은 크기의 3D 밸브와 맞춤
+    Object.values(rows).filter(r => r.c === 'VALVE' && r.dn).forEach(r => { Object.values(rows).filter(x => / V\/V$/.test(x.c) && !x.dn && x.z === r.z).forEach(x => { r.m += x.m; x.m = 0; x.merged = 1; }); });
+    const list = Object.values(rows).filter(r => !(r.merged && !r.m));
+    list.forEach(r => {
+      if (r.nq) r.st = 'q';
+      else if (!r.dn) r.st = 'extra';
+      else if (r.c === 'PIPE') { r.m = Math.round(r.m * 100) / 100; r.st = r.m <= r.d + 0.3 && r.m >= r.d - Math.max(1, r.d * 0.5) ? 'ok' : 'diff'; }
+      else r.st = Math.abs(r.d - r.m) < 0.01 ? 'ok' : 'diff';
+      if (r.c === 'NIPPLE' && !r.m && r.st === 'diff') r.st = 'nip';
+    });
+    const ord = Object.keys(CATK);
+    list.sort((a, b) => (ord.indexOf(a.c) + 1 || 99) - (ord.indexOf(b.c) + 1 || 99) || (b.z || 0) - (a.z || 0));
+    return list;
+  }
+  function bomHtml(list) {
+    const ST = { ok: ['✓ 같음', 'ok'], diff: ['차이', 'bad'], extra: ['도면에 없음', 'us'], q: ['수량 못 읽음', 'us'], nip: ['3D는 배관으로', 'fit'] };
+    const nd = list.filter(r => r.st === 'diff').length;
+    return `<h3 class="wzq" style="font-size:17px">도면 BOM ↔ 3D 자재 ${nd ? `<span class="wzsrc bad">다른 곳 ${nd}개</span>` : '<span class="wzsrc ok">모두 맞음</span>'}</h3>
+<div class="wzrev"><table><thead><tr><th>품목</th><th>크기</th><th>도면 BOM</th><th>3D</th><th>결과</th></tr></thead><tbody>${list.map(r => {
+      const u = r.c === 'PIPE' ? ' m' : '', zz = r.z == null ? '?' : nf(r.z) + (r.z2 ? ' × ' + nf(r.z2) : ''), diff = r.st === 'diff' && r.c !== 'PIPE' ? ` (${r.m - r.d > 0 ? '+' : ''}${r.m - r.d})` : '';
+      return `<tr><td>${E(CATK[r.c] || r.c)}</td><td>${zz}</td><td>${r.dn ? (r.nq ? (r.d ? r.d + ' + ?' : '?') : r.d + u) : '-'}</td><td>${r.m ? r.m + u : '-'}</td><td><span class="wzsrc ${ST[r.st][1]}">${ST[r.st][0]}${diff}</span></td></tr>`; }).join('')}</tbody></table></div>
+<p class="mut">BOM은 도면 그림에서 읽은 값이라 틀릴 수 있습니다. 배관은 BOM이 구매 길이(올림)라 3D가 조금 짧아도 같음으로 봅니다. 니플은 3D에서 짧은 배관으로 들어갑니다.</p>`;
+  }
+  function wBomSec() {
+    if (!W || !W.built) return '';
+    if (W.ocrRun) return '<p class="wzocrb">⏳ 도면 BOM을 읽는 중입니다… 다 읽으면 여기에 3D 자재와 비교표가 나옵니다.</p>';
+    if (!W.bom) return W.words ? '<p class="mut">이 도면에서는 BOM 표를 찾지 못했습니다 (CODE·SIZE 머리글이 있는 표를 찾습니다).</p>' : '';
+    const raw = `<details class="wzraw"><summary>도면에서 읽은 BOM ${W.bom.rows.length}줄 보기 · 잘못 읽은 값 고치기</summary><div class="wzrev"><table><thead><tr><th>CODE (읽은 글자)</th><th>품목</th><th>크기</th><th>수량</th></tr></thead><tbody>${W.bom.rows.map((x, i) => `<tr><td>${E(x.code)}</td><td><select data-bq="${i}:cat">${opt([['', '(제외)']].concat(Object.keys(CATK).map(k => [k, CATK[k]])), x.cat)}</select></td><td><select data-bq="${i}:size">${opt([['', '?']].concat(QS.map(v => [v, nf(v)])), x.size == null ? '' : x.size)}</select>${x.cat === 'REDUCER' ? ` × <select data-bq="${i}:size2">${opt([['', '?']].concat(QS.map(v => [v, nf(v)])), x.size2 == null ? '' : x.size2)}</select>` : ''} <span class="mut">${E(x.sizeTxt)}</span></td><td><input data-bq="${i}:qty" type="number" step="any" value="${x.qty == null ? '' : x.qty}" style="width:80px"></td></tr>`).join('')}</tbody></table></div></details>`;
+    try { return bomHtml(bomCompare(W.bom, P.bom(W.built))) + raw; } catch (e) { return '<p class="mut">BOM 비교를 못 했습니다 (' + E(e.message) + ').</p>'; }
+  }
+  /* ---------- ③ 여러 장 잇기 · ④ 좌표 맞춤 ---------- */
+  const normLn = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/O/g, '0');
+  const DIRV = k => P.DIR[k];
+  const negK = k => P.keyOf(P.DIR[k].clone().negate());
+  // 이 장의 열린 끝 (캡·블라인드·장치로 끝난 곳은 제외)
+  function openEnds(R) {
+    const out = [];
+    R.runs.forEach((r, ri) => {
+      if (!(r.start && r.start.tee) && r._c0 && r._d0) out.push({ id: ri + '.s', p: r._p0, c: r._c0, out: negK(r._d0), nps: +r._nps0 || +R.nps, lab: (ri + 1) + '번 배관 시작' });
+      r.steps.forEach((s2, si) => { if (s2.t === 'end' && s2._c && !['cap', 'blind'].includes(s2.end)) out.push({ id: ri + '.' + si, p: s2._p, c: s2._c, out: s2._din, nps: +s2._nps || +R.nps, lab: (ri + 1) + '번 배관 끝' }); });
+    });
+    return out;
+  }
+  // 경로의 모든 점 (좌표 넣을 기준점 고르기용)
+  function nodesOf(R) {
+    const out = [];
+    R.runs.forEach((r, ri) => {
+      if (r._c0) out.push({ id: ri + '.s', p: r._p0, c: r._c0, lab: (ri + 1) + '-시작' });
+      r.steps.forEach((s2, si) => { if (s2._c) out.push({ id: ri + '.' + si, p: s2._p, c: s2._c, lab: (ri + 1) + '-' + (si + 1) + ' ' + (WHAT[s2.t] || s2.t) }); });
+    });
+    return out;
+  }
+  async function joinCands(ends, me) {
+    const files = await P.fAll(), objs = P.getObjs(), res = [];
+    files.forEach(f => {
+      const sh = f.sheet; if (!sh || f.id === W.fid || !me.ln || normLn(sh.ln) !== normLn(me.ln)) return;
+      const ref = sh.ref && objs.find(o => o.id === sh.ref.id && o.src === 'iso:' + f.id); if (!ref) return;
+      const dv = [0, 1, 2].map(i => ref.pos[i] - sh.ref.pos[i]); // 그 장을 나중에 옮겼으면 그만큼
+      ends.forEach(e => sh.ends.forEach(t => {
+        if (!e.out || !t.out || DIRV(e.out).dot(DIRV(t.out)) > -0.9) return;
+        if (e.nps && t.nps && Math.abs(e.nps - t.nps) > 0.01) return;
+        let sc = 1 + (e.id.startsWith('0.') ? 0.5 : 0) + (String(t.id || '').startsWith('0.') ? 0.5 : 0); // 본 배관(첫 줄기) 끝을 우선
+        if (me.sht && sh.sht) { if (Math.abs(me.sht - sh.sht) === 1) sc += 2; else sc -= 1; }
+        if (e.to && sh.sht) sc += e.to === sh.sht ? 5 : -3;
+        if (t.to && me.sht) sc += t.to === me.sht ? 5 : -3;
+        const tc = [0, 1, 2].map(i => t.c[i] + dv[i]);
+        res.push({ e, t, f, sc, shift: [0, 1, 2].map(i => Math.round((tc[i] - e.c[i]) * 10) / 10), lab: (sh.sht ? sh.sht + '/' + (sh.of || '?') + '장 ' : '') + '(' + f.name + ') ' + t.lab });
+      }));
+    });
+    res.sort((a, b) => b.sc - a.sc);
+    return res;
+  }
+  async function wBuild() {
     const b = buildRoute(W.R, W.src);
+    const tt = W.title || {}, me = { ln: W.R.line_no || tt.line_no || '', sht: tt.sht || null, of: tt.of || null };
+    const ends = openEnds(W.R);
+    // 도면에서 읽은 'SEE 2/3' 표시를 가까운 끝에 붙임
+    (W.see || []).forEach(m => { let best = null, bd = 160; ends.forEach(e => { const d = Math.hypot(e.p[0] - m.p[0], e.p[1] - m.p[1]); if (d < bd) { bd = d; best = e; } }); if (best) best.to = m.sht; });
+    W.cands = await joinCands(ends, me);
+    if (W.shift === undefined) {
+      W.shift = null; W.placed = null;
+      const c0 = W.cands[0], c1 = W.cands[1];
+      if (c0 && (!c1 || c0.sc > c1.sc)) { W.shift = c0.shift; W.placed = { kind: 'join', lab: c0.lab, e: c0.e.lab, i: 0 }; }
+    }
+    if (W.shift) b.objs.forEach(o => { if (o.pos) o.pos = o.pos.map((v, i) => Math.round((v + W.shift[i]) * 10) / 10); });
     P.removeWhere(o => o.src === W.src);
-    if (b.objs.length) P.loadModel(Object.assign(b, { name: W.f.name.replace(/\.pdf$/i, '') }));
-    const f = W.f; f.route = W.R; P.fPut(f);
-    const ids = P.getObjs().filter(o => o.src === W.src && !o.ex).map(o => o.id);
+    if (b.objs.length) P.loadModel(Object.assign(b, { name: W.f.name.replace(/\.pdf$/i, ''), keepPos: !!W.shift }));
+    const made = P.getObjs().filter(o => o.src === W.src);
+    const f = W.f; f.route = W.R;
+    if (made.length && b.objs.length) {
+      const off = [0, 1, 2].map(i => made[0].pos[i] - b.objs[0].pos[i] + (W.shift ? W.shift[i] : 0));
+      f.sheet = { ln: me.ln, sht: me.sht, of: me.of, ends: ends.map(e => ({ id: e.id, c: e.c.map((v, i) => v + off[i]), out: e.out, nps: e.nps, to: e.to || null, lab: e.lab })), ref: { id: made[0].id, pos: made[0].pos.slice() } };
+    }
+    P.fPut(f);
+    const ids = made.filter(o => !o.ex).map(o => o.id);
     P.ov('3D로 바꾸기 — 완료', `<div class="wz"><h3 class="wzq">3D를 만들었습니다 (부품 ${b.objs.length}개).</h3>
 ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 있습니다 (예: 앞 부품과 길이가 겹침). 3D를 보고 이상하면 "이전 단계로" 돌아가 길이를 고치거나, 고급 편집에서 확인하세요.</p>` : ''}
 <div class="wzb"><button data-wz="see3d" class="pri big">3D로 보기</button><button data-wz="seeiso" class="big">ISO로 원본과 비교</button></div>
+<div id="wzjoin"></div><div id="wzbom"></div>
 <div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button><span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
-    W.built = ids;
+    W.built = ids; W.atBuild = true;
+    wJoinUI();
+    const bx = $('wzbom'); if (bx) { bx.innerHTML = wBomSec(); bx.onchange = e => { const t = e.target.closest('[data-bq]'); if (!t) return; const [i, k] = t.dataset.bq.split(':'), row = W.bom.rows[+i]; const v = t.value; row[k] = k === 'cat' ? v : (v === '' ? null : +v); const op = bx.querySelector('details').open; bx.innerHTML = wBomSec(); if (op) bx.querySelector('details').open = true; }; }
+    if (W.ocrRun) { const w0 = W, t = setInterval(() => { if (W !== w0 || !$('wzbom')) return clearInterval(t); if (!w0.ocrRun) { clearInterval(t); $('wzbom').innerHTML = wBomSec(); } }, 1000); }
   }
   function wClick(e) {
     const b = e.target.closest('[data-wz]'); if (!b || !W) return;
@@ -1009,6 +1173,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
     if (a === 'see3d') { P.focus(P.getObjs().filter(o => o.src === W.src).map(o => o.id)); return; }
     if (a === 'seeiso') { if (W.built && W.built.length) P.showIso(W.built[0]); return; }
     if (a === 'again') { W.q = { ri: 0, si: 0, phase: 'done' }; wRender(); return; }
+    if (a === 'join' || a === 'xyz') { wPlace(a); return; }
     wAnswer(a);
   }
   document.getElementById('isob').addEventListener('click', wClick);
@@ -1018,6 +1183,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 .wzq{font-size:20px;margin:14px 0 10px}.wzt{display:inline-block;background:#e0f2fe;color:#075985;border-radius:4px;padding:1px 8px;font-size:14px;vertical-align:middle}
 .wzb{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.wzb button{font-size:17px;padding:10px 16px;border-radius:8px;min-width:90px}.wzb button.on{outline:3px solid #0f766e}.wz button.big{font-size:18px;padding:12px 22px}.wz button.ghost{background:#f8fafc;color:#475569}.wzno{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px}.wzno span{font-size:14px;color:#9a3412}.wzno button{font-size:15px;padding:7px 12px}.wz button.warn{background:#fff;color:#b91c1c;border-color:#fca5a5}
 .wzrev{max-height:300px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;margin:6px 0 10px}.wzrev table{width:100%;border-collapse:collapse;font-size:15px}.wzrev th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:6px 8px}.wzrev td{padding:4px 8px;border-top:1px solid #f1f5f9}.wzrev tr[data-wzrow]{cursor:pointer}.wzrev tr.on td{background:#e0f2fe}.wzrev input{width:90px;font-size:15px;padding:3px 6px}
+#wzbom .wzrev{max-height:none}.wzraw{margin:6px 0 12px}.wzraw summary{cursor:pointer;color:#0f766e;font-size:15px}.wzraw select{font-size:14px}
 .wzocrb{background:#fff7ed;border:1px dashed #fdba74;border-radius:6px;padding:5px 10px;font-size:14px;color:#9a3412;margin:0 0 6px}.wzsrc{display:inline-block;border-radius:4px;padding:1px 8px;font-size:13px}.wzsrc.ok{background:#dcfce7;color:#166534}.wzsrc.fit{background:#e0f2fe;color:#075985}.wzsrc.us{background:#f1f5f9;color:#334155}.wzsrc.bad{background:#fee2e2;color:#991b1b}.wzt.wzto{background:#ffedd5;color:#9a3412}
 .wzs{gap:12px;flex-wrap:wrap;margin:8px 0}.wzs input{font-size:16px;padding:6px}.wzft{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:10px}
 @media(max-width:700px){#wzmini{display:none}.wzq{font-size:17px}}`;
