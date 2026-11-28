@@ -326,9 +326,9 @@
     const best = res[0], H = res.find(x => x.pl === 'H') || best;
     if (!best) return null;
     const pick = best.sc >= 3 ? best : H; // 증거가 없으면 수평으로 가정 (질문에서 바꿈)
-    const alts = {}; PAIRS.forEach(([p, q, pl]) => { const ab = decompose(v, p, q); if (ab) alts[pl] = diagKey(p, q, ab[0], ab[1]); });
+    const alts = {}, pq = {}; PAIRS.forEach(([p, q, pl]) => { const ab = decompose(v, p, q); if (ab) { alts[pl] = diagKey(p, q, ab[0], ab[1]); pq[pl] = { p, q, a: Math.round(ab[0] * 100) / 100, b: Math.round(ab[1] * 100) / 100 }; } });
     const ratio = Math.abs(pick.al) / (Math.abs(pick.be) || 1e-6);
-    return { legA: [Math.round(deg(AXV[pick.p][0], AXV[pick.p][1])), Math.round(deg(AXV[pick.q][0], AXV[pick.q][1]))], pl: pick.pl, lc: pick.lc, key: diagKey(pick.p, pick.q, pick.al, pick.be), alts, ang: Math.round(Math.atan2(Math.abs(pick.be), Math.abs(pick.al)) * 180 / Math.PI), sure: !!(best && best.sc >= 3), C: pick.C, hatch: pick.hatch, legs: [Math.abs(pick.al), Math.abs(pick.be)], ratio };
+    return { pq, legA: [Math.round(deg(AXV[pick.p][0], AXV[pick.p][1])), Math.round(deg(AXV[pick.q][0], AXV[pick.q][1]))], pl: pick.pl, lc: pick.lc, key: diagKey(pick.p, pick.q, pick.al, pick.be), alts, ang: Math.round(Math.atan2(Math.abs(pick.be), Math.abs(pick.al)) * 180 / Math.PI), sure: !!(best && best.sc >= 3), C: pick.C, hatch: pick.hatch, legs: [Math.abs(pick.al), Math.abs(pick.be)], ratio };
   }
   // 빗금 삼각형의 변(아이소 축 방향의 가는 선)이 배관으로 잡힌 것 지우기 / 배관에 이어 붙은 변 잘라내기
   function legClean(pipes, P1, C) {
@@ -474,7 +474,8 @@
         used.add(e);
         const other = e.n0 === node ? e.n1 : e.n0, d = edgeDir(e, node.p, other.p);
         const rl = e.l.roll ? Object.assign({}, e.l.roll, { fw: dist(node.p, e.l.a) < dist(node.p, e.l.b) }) : null;
-        if (rl && !rl.fw) { rl.key = negD(rl.key); rl.alts = Object.fromEntries(Object.entries(rl.alts).map(([k, v]) => [k, negD(v)])); }
+        if (rl && !rl.fw) { rl.key = negD(rl.key); rl.alts = Object.fromEntries(Object.entries(rl.alts).map(([k, v]) => [k, negD(v)])); rl.pq = Object.fromEntries(Object.entries(rl.pq || {}).map(([k, v]) => [k, Object.assign({}, v, { a: -v.a, b: -v.b })])); }
+        if (rl) delete rl.C;
         if (!dir) { dir = d; run.dir = d; if (rl) run.roll = rl; }
         else if (d !== dir) { const el = { t: 'elbow', to: d, conf: 'low' }; if (rl) el.roll = rl; if (prevRoll || rl) el.e45 = true; put(el, node.p); dir = d; }
         prevRoll = rl; if (rl) pendRoll = rl;

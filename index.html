@@ -18,10 +18,22 @@ html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--fg);font:13px/1.45 -apple-system,"Malgun Gothic","Noto Sans KR",sans-serif}
 #app{height:100%;display:flex;flex-direction:column}
 header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:var(--pn);border-bottom:1px solid var(--bd)}
-header b{font-size:15px}.mut{color:var(--mut)}
+header b{font-size:15px}
+header .hg{display:flex;gap:6px;align-items:center}header button{white-space:nowrap}@media(max-width:800px){header{gap:6px}header .hbig{font-size:13px}#pal{max-height:30vh;overflow:auto}#pal .pg{flex:1 1 100%}#pal .gg{grid-template-columns:repeat(4,1fr)!important}#leg{display:none!important}}
+header .hbig{background:#0f766e;color:#fff;border-color:#0f766e;font-weight:600}
+.menu{position:relative}.menu .mb{font-weight:500}.menu.open .mb{border-color:var(--ac);color:var(--ac)}
+.menu .mp{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:40;min-width:260px;background:var(--pn);border:1px solid var(--bd);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.16);padding:6px}
+.menu.open .mp{display:block}.menu .mp button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;margin:0}
+.menu .mp button:hover{background:rgba(15,118,110,.08)}.menu .mp b{display:block;font-size:14px;font-weight:600}.menu .mp span{display:block;font-size:12px;color:var(--mut);margin-top:1px}
+.hq{margin-left:4px}#helpp{position:fixed;right:12px;top:52px;z-index:45;background:var(--pn);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:10px 16px;font-size:13px;max-width:420px}#helpp ul{margin:4px 0 8px;padding-left:18px}
+#pal .ps{width:100%;box-sizing:border-box;padding:6px 8px;margin-bottom:6px;border:1px solid var(--bd);border-radius:6px;background:var(--in)}
+#pal .pg h4{cursor:pointer;user-select:none;display:flex;justify-content:space-between}#pal .pg h4::after{content:'▾'}#pal .pg.cl h4::after{content:'▸'}#pal .pg.cl .gg{display:none}
+#pal .gg{display:grid;grid-template-columns:1fr 1fr;gap:4px}#pal .gg button{margin:0;padding:6px 5px;font-size:12.5px;line-height:1.25;text-align:center;min-height:34px}
+#pal .gg button:hover{border-color:var(--ac);color:var(--ac)}
+.xyz{display:block!important;margin-top:12px;border-top:1px solid var(--bd);padding-top:8px}.xyz summary{display:list-item;cursor:pointer;font-weight:600;font-size:13px;color:var(--ac)}.xyz select{width:100%;max-width:100%;min-width:0}.xyz .xr{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 8px;align-items:center;margin:6px 0}.xyz input{width:100%;box-sizing:border-box}.xyz .xp{font-size:12px;color:var(--mut)}.mut{color:var(--mut)}
 #leg{display:flex;gap:10px;margin-left:auto}#leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
 main{flex:1;display:flex;min-height:0}
-#pal{width:150px;padding:8px;overflow:auto;background:var(--pn);border-right:1px solid var(--bd)}
+#pal{width:190px;padding:8px;overflow:auto;background:var(--pn);border-right:1px solid var(--bd)}
 #pal h4,#side h4{margin:10px 0 6px;font-size:12px;color:var(--mut);font-weight:600}
 #pal h4:first-child{margin-top:0}
 button,select,input,textarea{font:inherit;color:var(--fg)}
@@ -54,7 +66,14 @@ button:hover{border-color:var(--ac)}button:focus-visible,input:focus-visible,sel
 button.pri{background:#0f766e;color:#fff;border-color:#0f766e}
 </style></head><body>
 <div id="app">
-<header><b>PLANT 3D</b><span id="ver"></span><button id="jobn" title="작업 목록 / 새 작업">작업: -</button><button id="jsave" class="pri">저장</button><button id="undo" title="되돌리기 (Ctrl+Z)" disabled>↶</button><button id="redo" title="다시하기 (Ctrl+Y)" disabled>↷</button><button id="bchk">모델 검사</button><span id="jst" class="mut"></span><span id="leg"></span><button id="bxls">엑셀 (자재·용접)</button><button id="bortho">평면·입면도</button><button id="bclash">간섭 체크</button><button id="bat">ISO 첨부</button><button id="bj">가스켓·조인트 목록</button><button id="bd">파일 백업</button></header>
+<header><b>PLANT 3D</b><span id="ver"></span>
+<div class="hg"><button id="jobn" title="작업 목록 / 새 작업">작업: -</button><button id="jsave" class="pri">저장</button><button id="undo" title="되돌리기 (Ctrl+Z)" disabled>↶</button><button id="redo" title="다시하기 (Ctrl+Y)" disabled>↷</button><span id="jst" class="mut"></span></div>
+<div class="hg"><button id="bat" class="hbig" title="ISO 도면 PDF를 3D로 바꾸기 · 도면·사진 첨부">📄 ISO 도면 → 3D</button>
+<div class="menu"><button class="mb">📐 도면 ▾</button><div class="mp"><button id="biso"><b>ISO 도면 만들기</b><span>고른 배관 라인을 ISO로 · 장 나누기 · PDF</span></button><button id="bortho"><b>평면·입면도</b><span>위·앞·옆에서 본 도면</span></button><button id="bxyz"><b>📍 실제 좌표에 놓기</b><span>부품을 고르고 E·N·EL 좌표로 옮기기</span></button></div></div>
+<div class="menu"><button class="mb">✔ 검사 ▾</button><div class="mp"><button id="bchk"><b>모델 검사</b><span>안 붙은 끝·크기 안 맞음·라인 번호 빠짐</span></button><button id="bclash"><b>간섭 체크</b><span>배관·장치·철골끼리 부딪히는 곳</span></button></div></div>
+<div class="menu"><button class="mb">📦 내보내기 ▾</button><div class="mp"><button id="bxls"><b>엑셀 (자재·용접)</b><span>MTO 자재표 · 용접 대장</span></button><button id="bj"><b>가스켓·조인트 목록</b><span>플랜지 이음마다 가스켓·볼트</span></button><button id="bd"><b>파일 백업 · 열기</b><span>작업을 파일로 저장 / 불러오기</span></button></div></div></div>
+<span id="leg" title="시공 상태 색 (오른쪽 아래 '상태색'으로 켜고 끔)"></span><button id="bhelp" class="hq" title="조작법">? 조작법</button></header>
+<div id="helpp" hidden><b>마우스</b><ul><li>빈 곳 드래그: 돌려 보기 · Shift/오른쪽 드래그: 화면 이동</li><li>휠: 마우스가 가리킨 곳으로 확대·축소</li><li>부품 드래그: 바닥 위로 이동 · Alt(또는 Z)+드래그: 높이</li></ul><b>선택</b><ul><li>클릭: 하나 · Ctrl+클릭: 하나씩 추가 · 빈 곳 Ctrl+드래그: 네모로 여러 개</li><li>부품 클릭 후 A: 연결된 배관·부품 모두</li></ul><b>키보드</b><ul><li>방향키·Q/E: 조금씩 이동 · R: 90° 돌리기 · F: 전체 보기 · Delete: 지우기 · Ctrl+Z/Y: 되돌리기/다시</li></ul></div>
 <main>
 <aside id="pal"></aside>
 <div id="vp"><canvas id="cv"></canvas><div id="vbar"><button data-v="iso" title="기본 입체 시점">ISO</button><button data-v="top" title="위에서 (평면도)">위</button><button data-v="front" title="앞에서 (남→북)">앞</button><button data-v="right" title="오른쪽에서 (동→서)">옆</button><button data-v="fit" title="전체 보기 (F)">전체</button><div class="sep"></div><button id="vort" title="원근 / 평행 투영 (도면처럼)">원근</button><button id="vcol" title="색: 시공 상태 / 실물 재질">상태색</button></div><div id="hint"></div></div>
@@ -102,10 +121,10 @@ const LIN=['pipe','elbow','tee','reducer','coupling','flange','valve','strainer'
 const DEF={pipe:{nps:4,len:3000,axis:'+X',trace:false},elbow:{nps:4,kind:'lr90',axis:'+X',turn:'+Y'},flange:{nps:4,kind:'wn',cls:150,face:'RF',axis:'+X'},tee:{nps:4,nps2:4,axis:'+X',branch:'+Y'},reducer:{nps:6,nps2:4,rt:'conc',axis:'+X'},psv:{nps:2,nps2:3,cls:300,axis:'+Y',turn:'+X'},cap:{nps:4,axis:'+X'},inst:{nps:.5,kind:'FT',axis:'+Y',len:0},valve:{nps:4,vt:'gate',conn:'flg',cls:150,face:'RF',axis:'+X'},trap:{nps:.75,conn:'flg',cls:150,face:'RF',axis:'+X'},coupling:{nps:.75,ce:'sw',axis:'+X'},rack:{len:12000,w:6000,h:4000,tiers:2,th:1500,bay:6000,hs:'H250',rot:0},platform:{len:4000,w:2000,h:3000,rot:0},ladder:{h:3000,rot:0},beam:{len:3000,hs:'H200',rot:0},support:{nps:4,sk:'shoe',axis:'+X',h:100},strainer:{nps:4,st:'y',conn:'flg',cls:150,face:'RF',axis:'+X'},drum:{dia:2000,len:5000,rot:0},vessel:{dia:2000,h:6000},reactor:{dia:2800,h:9000},hx:{dia:900,len:6000,rot:0},pump:{nps:4,nps2:3,cls:150,len:1600,rot:0}};
 const FLD={pipe:['nps','len','axis','weld','trace','ex'],elbow:['nps','ce','kind','axis','turn','ex'],coupling:['nps','ce','axis','ex'],rack:['len','w','h','tiers','th','bay','hs','rot'],platform:['len','w','h','rot'],ladder:['h','rot'],beam:['len','hs','rot'],tee:['nps','nps2','ce','axis','branch','ex'],reducer:['nps','nps2','rt','axis','ex'],psv:['nps','nps2','cls','axis','turn','ex'],cap:['nps','ce','axis','ex'],inst:['kind','nps','axis','ex'],flange:['nps','kind','cls','face','axis','ex'],valve:['nps','vt','conn','cls','face','len','axis','ex'],trap:['nps','conn','cls','face','len','axis','ex'],strainer:['nps','st','conn','cls','face','len','axis','ex'],support:['sk','nps','h','ln','axis'],drum:['dia','len','rot'],vessel:['dia','h'],reactor:['dia','h'],hx:['dia','len','rot'],pump:['nps','nps2','cls','len','rot']};
 const LB={w:'폭(mm)',tiers:'단 수',th:'단 간격(mm)',bay:'기둥 간격(mm)',hs:'형강 규격',ce:'이음 방식 (2" 이하)',sk:'서포트 종류',st:'스트레이너 형식',tag:'태그',nps:'배관 사이즈',len:'길이(mm)',axis:'방향',trace:'스팀 트레이싱',vt:'밸브 형상',dia:'직경(mm)',h:'높이(mm)',rot:'회전(°)',status:'시공 상태',note:'메모',px:'X',py:'Y',pz:'Z',kind:'종류',turn:'꺾이는/출구 방향',nps2:'분기·출구 사이즈',branch:'분기 방향',ecc:'편심(Eccentric)',ln:'라인 번호',spec:'재질/규격',rt:'레듀서 종류',cls:'압력 등급',face:'면 형상',conn:'끝단 연결',weld:'끝단 용접선',ex:'기존 배관 (반투명 표시 · BOM 제외)'};
-const V=(x,y,z)=>new THREE.Vector3(x,y,z),B6={'+X':V(1,0,0),'-X':V(-1,0,0),'+Y':V(0,1,0),'-Y':V(0,-1,0),'+Z':V(0,0,1),'-Z':V(0,0,-1)},DIR=Object.assign({},B6);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z),B6={'+X':V(1,0,0),'-X':V(-1,0,0),'+Y':V(0,1,0),'-Y':V(0,-1,0),'+Z':V(0,0,1),'-Z':V(0,0,-1)},DIR=new Proxy(Object.assign({},B6),{get(t,k){if(k in t)return t[k];if(typeof k==='string'&&k.startsWith('v:')){const a=k.slice(2).split(',').map(Number);if(a.length===3&&a.every(isFinite)){const v=V(a[0],a[1],a[2]);if(v.length()>1e-6){t[k]=v.normalize();return t[k]}}}return undefined}}); /* 'v:x,y,z' = 임의 방향(롤링 배관) */
 ['+X','-X'].forEach(a=>['+Z','-Z','+Y','-Y'].forEach(t=>DIR[a+t]=B6[a].clone().add(B6[t]).normalize()));
 ['+Z','-Z'].forEach(a=>['+Y','-Y'].forEach(t=>DIR[a+t]=B6[a].clone().add(B6[t]).normalize()));
-const keyOf=v=>Object.keys(DIR).find(k=>DIR[k].distanceTo(v)<1e-3)||'+X';
+const keyOf=v=>{if(!v||v.length()<1e-6)return'+X';const u=v.clone().normalize();return Object.keys(DIR).find(k=>!k.startsWith('v:')&&DIR[k].distanceTo(u)<1e-3)||Object.keys(DIR).find(k=>DIR[k].distanceTo(u)<1e-4)||'v:'+[u.x,u.y,u.z].map(n=>Math.round(n*1e4)/1e4).join(',')};
 const ix=n=>Math.max(0,SZ.findIndex(s=>s[0]==n)),TC=[25,29,38,57,64,86,105,143,178,216,254,279,305,343,381,432],RH=[38,38,51,64,76,89,102,140,152,178,203,330,356,381,508,508];
 const bas=x=>{const r=Math.abs(x.y)>.99?V(0,0,1):V(0,1,0),y=r.clone().addScaledVector(x,-r.dot(x)).normalize();return new THREE.Matrix4().makeBasis(x,y,x.clone().cross(y))};
 const upv=x=>V(0,0,0).setFromMatrixColumn(bas(x),1);
@@ -168,7 +187,7 @@ function bomItems(set,dme,js,ids){
  const bm={},add=(code,size,desc,q)=>{const kk=code+'|'+size+'|'+desc;(bm[kk]=bm[kk]||{code,size,desc,q:0}).q+=q};
  set.forEach(x=>{const t=x.type,z=nf(x.nps),cl=x.cls||150;
   if(t==='pipe')add('PIPE',z,x.spec||dme.ps,x.len/1000);
-  else if(t==='elbow')add('ELBOW',z,`${x.spec||dme.fs} ${isSB(x)?EK[x.kind||'lr90'][1]+'°':EC[x.kind||'lr90']} ${ceT(x)}`,1);
+  else if(t==='elbow')add('ELBOW',z,`${x.spec||dme.fs} ${x.ang?Math.round(x.ang*10)/10+'° '+(x.kind==='sr90'?'SR':'LR')+' (롤링 각도)':isSB(x)?EK[x.kind||'lr90'][1]+'°':EC[x.kind||'lr90']} ${ceT(x)}`,1);
   else if(t==='coupling')add('COUPLING',z,`${x.spec||dme.fs} FULL ${ceT(x)}`,1);
   else if(t==='tee')add('TEE',z+(x.nps2!==x.nps?'X'+nf(x.nps2):''),`${x.spec||dme.fs} ${ceT(x)}`,1);
   else if(t==='reducer')add('REDUCER',z+'X'+nf(x.nps2),`${x.spec||dme.fs} ${rtk(x)==='conc'?'CONC':'ECC('+rtk(x).toUpperCase()+')'} BW`,1);
@@ -354,7 +373,7 @@ function iso(mode){lastIso=mode;
    let rr=Math.atan2(out[1],out[0])*180/Math.PI;if(rr>90)rr-=180;if(rr<-90)rr+=180;const tp=[e[0]+out[0]*62,e[1]+out[1]*62-6],hw=58,du=[Math.cos(rr*Math.PI/180),Math.sin(rr*Math.PI/180)];for(let it=0;it<2;it++)[[0,40,770],[1,75,668]].forEach(([k,lo,hi])=>{const a1=tp[k]-Math.abs(du[k])*hw,b1=tp[k]+Math.abs(du[k])*hw;if(a1<lo)tp[k]+=lo-a1;if(b1>hi)tp[k]-=b1-hi});s+=tx(tp[0],tp[1],'SEE DWG SHT NO.('+(oi+1)+'/'+SH.length+')',8.5,'#111',rr)})}
  if(isoCut&&mode!=='sel'){const cs=new Set((dm[key]||{}).cuts||[]);cutPts(set).concat(cutPts(set0).filter(c=>cs.has(c.k)&&(set.includes(c.a)!==set.includes(c.b)))).forEach(c=>{const q=tf(c.p),on=cs.has(c.k);s+=`<g data-cut='${c.k}' style='cursor:pointer'><circle cx='${f1(q[0])}' cy='${f1(q[1])}' r='9' fill='${on?'#dc2626':'#f97316'}' fill-opacity='${on?.85:.25}' stroke='${on?'#991b1b':'#ea580c'}' stroke-width='1.5'/>${on?`<text x='${f1(q[0])}' y='${f1(q[1]+4)}' font-size='11' text-anchor='middle' fill='#fff'>✂</text>`:''}</g>`})}
  /* 경사(롤링) 배관: 빗금 삼각형 + 오프셋 치수 */
- set.filter(o=>o.type==='pipe'&&/[XYZ].*[XYZ]/.test(o.axis||'')).forEach(o=>{const pp=ports(o),nb=conO(o).filter(x=>x.type==='elbow');
+ set.filter(o=>{if(o.type!=='pipe')return false;const a=DIR[o.axis];return a&&[a.x,a.y,a.z].filter(v=>Math.abs(v)>.01).length>=2}).forEach(o=>{const pp=ports(o),nb=conO(o).filter(x=>x.type==='elbow');
   const corner=pt=>{const e=nb.find(x=>ports(x).some(q=>Math.hypot(q.p[0]-pt.p[0],q.p[1]-pt.p[1],q.p[2]-pt.p[2])<5));if(!e)return pt.p;const g=eg(e),k=g.R*Math.tan(g.th/2);
    return[e.pos[0]+g.a.x*k,e.pos[1]+g.a.y*k,e.pos[2]+g.a.z*k]};
   const c1=corner(pp[1]),c2=corner(pp[0]),v=[0,1,2].map(i=>c2[i]-c1[i]),ix=[0,2,1].filter(i=>Math.abs(v[i])>1);if(ix.length!==2)return;
@@ -559,7 +578,7 @@ const sbi=n=>[.5,.75,1,1.5,2].indexOf(+n),isSB=o=>o&&(o.ce==='sw'||o.ce==='thd')
 const sbJ=o=>{const i=sbi(o.nps);return (o.ce||o.conn)==='thd'?THE[i]:SWJ[i]},sbR=o=>SWO[sbi(o.nps)]/2,CET={bw:'BW',sw:'SW 3000#',thd:'THD 3000#'},ceT=x=>CET[x.ce||'bw']||'BW';
 const EK={lr90:['90° 롱 (LR)',90,1.5],sr90:['90° 숏 (SR)',90,1],lr45:['45° 롱 (LR)',45,1.5],ret180:['180° 리턴',180,1.5],bd3:['3D 벤드 90°',90,3]};
 const BFF=[33,33,33,40,43,46,52,56,60,68,78,78,102,114,127,154];
-const eg=o=>{const [,an,k]=EK[o.kind||'lr90'],R=isSB(o)&&an<180?SWA[sbi(o.nps)]/Math.tan(an*Math.PI/360):(o.nps==.75&&k===1.5)?28.6:k*25.4*Math.max(o.nps,1),a=DIR[o.axis];let tk=o.turn||'+Y';if(Math.abs(a.dot(DIR[tk]))>.01)tk=['+Y','+Z','+X'].find(x=>Math.abs(a.dot(DIR[x]))<.01);const tt=DIR[tk],th=an*Math.PI/180;return{R,th,a,t:tt,end:V(o.pos[0],o.pos[1],o.pos[2]).addScaledVector(a,R*Math.sin(th)).addScaledVector(tt,R*(1-Math.cos(th))),out:a.clone().multiplyScalar(Math.cos(th)).addScaledVector(tt,Math.sin(th))}};
+const eg=o=>{const [,an0,k]=EK[o.kind||'lr90'],an=+o.ang||an0,R=isSB(o)&&an<180?SWA[sbi(o.nps)]/Math.tan(an*Math.PI/360):(o.nps==.75&&k===1.5)?28.6:k*25.4*Math.max(o.nps,1),a=DIR[o.axis];let tk=o.turn||'+Y';if(Math.abs(a.dot(DIR[tk]))>.01)tk=['+Y','+Z','+X'].find(x=>Math.abs(a.dot(DIR[x]))<.01);const tt=DIR[tk],th=an*Math.PI/180;return{R,th,a,t:tt,end:V(o.pos[0],o.pos[1],o.pos[2]).addScaledVector(a,R*Math.sin(th)).addScaledVector(tt,R*(1-Math.cos(th))),out:a.clone().multiplyScalar(Math.cos(th)).addScaledVector(tt,Math.sin(th))}};
 const outAxis=o=>o.type==='elbow'?keyOf(eg(o).out):o.axis;
 const endOf=o=>{if(o.type==='elbow'){const e=eg(o).end;return[e.x,e.y,e.z].map(v=>Math.round(v*10)/10)}if(!LIN.includes(o.type))return o.pos.slice();const d=DIR[o.axis];return o.pos.map((v,i)=>v+d.getComponent(i)*o.len)};
 
@@ -575,6 +594,7 @@ const cpH=document.createElement('div');cpH.style.cssText='position:absolute;rig
 const nAr=new THREE.ArrowHelper(new THREE.Vector3(0,0,-1),new THREE.Vector3(-3,.02,2),2.5,0xdd3333,.5,.3);sc.add(nAr);
 function cpU(){const sx=Math.sin(yaw),sy=Math.cos(yaw)*Math.sin(pit),L=Math.hypot(sx,sy)||1;cpH.querySelector('#cpA').setAttribute('transform','rotate('+(Math.atan2(sx,sy)*180/Math.PI).toFixed(1)+')');const t=cpH.querySelector('#cpT');t.setAttribute('x',(sx/L*22).toFixed(1));t.setAttribute('y',(-sy/L*22+4).toFixed(1))}
 function cm(){camAnim();cpU();cam.position.set(tg.x+dist*Math.cos(pit)*Math.sin(yaw),tg.y+dist*Math.sin(pit),tg.z+dist*Math.cos(pit)*Math.cos(yaw));cam.lookAt(tg);
+ if(cam===camP){const nn=Math.max(.002,dist*.004);if(Math.abs(camP.near-nn)>nn*.25){camP.near=nn;camP.far=Math.max(800,dist*80);camP.updateProjectionMatrix()}}
  if(cam===camO){const h=dist*Math.tan(22.5*Math.PI/180),a=camP.aspect||1;camO.left=-h*a;camO.right=h*a;camO.top=h;camO.bottom=-h;camO.updateProjectionMatrix()}
  const sd=Math.max(6,dist*1.1);dl.position.set(tg.x+sd*.6,tg.y+sd*1.2,tg.z+sd*.45);dl.target.position.copy(tg);const scm=dl.shadow.camera;if(Math.abs(scm.right-sd)>.01){scm.left=-sd;scm.right=sd;scm.top=sd;scm.bottom=-sd;scm.near=.1;scm.far=sd*4;scm.updateProjectionMatrix()}}
 /* 부드러운 카메라 이동 */
@@ -726,7 +746,7 @@ function jStart(){const L=jobs.slice().sort((a,b)=>b.updated-a.updated);
  $('jobmb').querySelectorAll('.jl [data-j]').forEach(el=>el.onclick=()=>jOpen(el.dataset.j))}
 function lg(t){log.unshift(new Date().toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'  '+t);log=log.slice(0,300);save();rl()}
 function rl(){jUI();$('log').innerHTML=log.slice(0,40).map(s=>'<div>'+s.replace(/</g,'&lt;')+'</div>').join('')||'아직 기록이 없습니다.'}
-function hint(){$('hint').textContent=objs.length?'화면 드래그: 회전 · Shift/우클릭 드래그: 화면 이동 · 휠: 확대 · 부품 드래그: 바닥 이동 · Alt(Z)+드래그: 높이 · 방향키/Q·E: 미세 이동 · 부품 클릭 후 A: 연결된 것 모두 선택 · Ctrl+클릭: 하나씩 추가 · 빈 곳 Ctrl+드래그: 네모 선택 · R: 90° 돌리기':'왼쪽 목록에서 부품을 눌러 추가하세요. 배관·밸브를 선택한 상태에서 추가하면 그 끝에 이어 붙습니다.'}
+function hint(){$('hint').textContent=objs.length?'드래그: 돌려 보기 · 휠: 가리킨 곳 확대 · 부품 클릭: 선택 (A: 연결된 것 모두) · 자세한 조작법은 위 오른쪽 "? 조작법"':'왼쪽 목록에서 부품을 눌러 추가하세요. 배관·밸브를 선택한 상태에서 추가하면 그 끝에 이어 붙습니다.'}
 
 /* 추가·수정 */
 function add(type){
@@ -753,10 +773,34 @@ function del(){const o=get(sid);if(!o)return;sc.remove(gm[sid]);delete gm[sid];o
 function dup(){const o=get(sid);if(!o)return;const c=JSON.parse(JSON.stringify(o));c.id=nid++;cnt[o.type]=(cnt[o.type]||0)+1;c.tag=T[o.type].p+'-'+String(cnt[o.type]).padStart(3,'0');c.pos[0]+=500;objs.push(c);rb(c);sel(c.id);lg(c.tag+' 복제 (원본 '+o.tag+')')}
 
 /* 패널 */
-function pal(){$('pal').innerHTML='<h4>배관류</h4>'+LIN.map(t=>'<button data-t="'+t+'">+ '+T[t].n+'</button>').join('')+'<button data-t="support" title="배관을 먼저 고른 뒤 누르세요">+ 서포트 (배관 위)</button><h4>철골</h4>'+STL.map(t=>'<button data-t="'+t+'">+ '+T[t].n+'</button>').join('')+'<h4>장치</h4>'+['drum','vessel','reactor','hx','pump'].map(t=>'<button data-t="'+t+'">+ '+T[t].n+'</button>').join('');
+/* 왼쪽 부품 목록: 찾기 + 접을 수 있는 묶음 + 두 줄 배치 */
+const PG=[['배관','pipe elbow tee reducer coupling cap'],['밸브·계기','valve strainer psv trap inst'],['연결·지지','flange support'],['철골',STL.join(' ')],['장치','drum vessel reactor hx pump']];
+const PN={pipe:'배관',elbow:'엘보',tee:'티',reducer:'레듀서',coupling:'커플링',cap:'캡',valve:'밸브',strainer:'스트레이너',psv:'안전밸브',trap:'스팀트랩',inst:'계기',flange:'플랜지',support:'서포트'};
+function pal(){let cl={};try{cl=JSON.parse(localStorage.getItem('p3d_palc')||'{}')}catch(e){}
+ $('pal').innerHTML='<input class="ps" id="pals" placeholder="🔍 부품 찾기 (예: 밸브)">'+PG.map(([g,ts])=>'<div class="pg'+(cl[g]?' cl':'')+'" data-g="'+g+'"><h4>'+g+'</h4><div class="gg">'+ts.split(' ').map(t=>'<button data-t="'+t+'" title="'+T[t].n+(t==='support'?' — 배관을 먼저 고른 뒤 누르세요':'')+'">'+(PN[t]||T[t].n)+'</button>').join('')+'</div></div>').join('');
+ $('pals').oninput=()=>{const q=$('pals').value.trim();document.querySelectorAll('#pal .pg').forEach(g=>{let n=0;g.querySelectorAll('button').forEach(b=>{const m=!q||b.textContent.includes(q)||b.title.includes(q)||b.dataset.t.includes(q.toLowerCase());b.hidden=!m;if(m)n++});g.hidden=!n;if(q)g.classList.remove('cl')})};
+ $('pal').querySelectorAll('.pg h4').forEach(h=>h.onclick=()=>{const g=h.parentNode;g.classList.toggle('cl');const c={};document.querySelectorAll('#pal .pg.cl').forEach(x=>c[x.dataset.g]=1);try{localStorage.setItem('p3d_palc',JSON.stringify(c))}catch(e){}});
  $('leg').innerHTML=Object.keys(ST).map(k=>'<span><i style="background:#'+ST[k].toString(16).padStart(6,'0')+'"></i>'+k+'</span>').join('')}
 const opt=(a,v)=>a.map(([k,l])=>'<option value="'+k+'"'+(String(k)===String(v)?' selected':'')+'>'+l+'</option>').join('');
-function rp(){const o=get(sid),el=$('props');if(!jm&&!bx){const ht=$('hint');if(ml.length>1)ht.textContent=ml.length+'개 선택됨 · 아무 부품이나 끌면 함께 이동 · R: 90° 돌리기 · A: 연결된 것까지 모두 · Ctrl+클릭: 추가·해제 · 빈 곳 클릭: 선택 해제';else if(o)ht.textContent=o.tag+' 선택됨 · A 키: 이 부품과 연결된 배관·부품 모두 선택 · Ctrl+클릭: 하나씩 추가 · 끌기: 이동 · R: 90° 돌리기';else hint()}if(ml.length>1){el.innerHTML=mhtml();return}
+function rp(){rp0();xyzSec()}
+/* 📍 좌표 보기·실제 좌표에 놓기 (E=동쪽 +X, N=북쪽 -Z, EL=높이 +Y, mm) */
+let xyzOpen=false;
+const toENE=p=>[Math.round(p[0]),Math.round(-p[2]),Math.round(p[1])];
+function grpOf(arr){const seen=new Set(arr),st=arr.slice();while(st.length){const c=st.pop();conO(c).forEach(x=>{if(!seen.has(x)){seen.add(x);st.push(x)}})}return[...seen]}
+function xyzSec(){const el=$('props');const sel=ml.length>1?ml.map(get).filter(Boolean):sid&&get(sid)?[get(sid)]:[];if(!sel.length)return;
+ const pts=[];sel.slice(0,12).forEach(o=>{if(o.pos)pts.push({k:o.id+':p',lab:o.tag+' 기준점',p:o.pos});try{ports(o).forEach((q,i)=>pts.push({k:o.id+':'+i,lab:o.tag+' '+q.n,p:q.p}))}catch(e){}});
+ const ip=pts[0],e0=toENE(ip.p);
+ el.insertAdjacentHTML('beforeend',`<details class="xyz"${xyzOpen?' open':''}><summary>📍 좌표 (E·N·EL) — 보기 · 실제 위치에 놓기</summary>
+<div class="xr"><label>기준점</label><select id="xyzp">${pts.map(q=>{const v=toENE(q.p);return`<option value="${q.k}">${EH(q.lab)} — E ${v[0]} · N ${v[1]} · EL ${v[2]}</option>`}).join('')}</select>
+<label>E (mm)</label><input id="xyze" type="number" value="${e0[0]}"><label>N (mm)</label><input id="xyzn" type="number" value="${e0[1]}"><label>EL (mm)</label><input id="xyzl" type="number" value="${e0[2]}">
+<label>함께 옮김</label><select id="xyzg"><option value="g">이어진 배관·부품 전체</option><option value="s">${sel.length>1?'선택한 '+sel.length+'개만':'이 부품만'}</option></select></div>
+<button id="xyzgo" class="pri">이 점을 이 좌표에 놓기</button><div class="xp">E는 동쪽, N은 북쪽, EL은 높이(mm). 도면의 좌표를 넣으면 그 자리로 통째로 옮깁니다. 되돌리기(Ctrl+Z) 가능.</div></details>`);
+ const d=el.querySelector('.xyz');d.ontoggle=()=>{xyzOpen=d.open};
+ const pick=()=>pts.find(q=>q.k===$('xyzp').value)||ip;
+ $('xyzp').onchange=()=>{const v=toENE(pick().p);$('xyze').value=v[0];$('xyzn').value=v[1];$('xyzl').value=v[2]};
+ $('xyzgo').onclick=()=>{const q=pick(),E=+$('xyze').value,N=+$('xyzn').value,L=+$('xyzl').value;if(![E,N,L].every(isFinite))return;const tg3=[E,L,-N],dv=[0,1,2].map(i=>tg3[i]-q.p[i]);if(dv.every(v=>Math.abs(v)<.05))return;
+  const mv=$('xyzg').value==='g'?grpOf(sel):sel;mv.forEach(o=>{if(o.pos){o.pos=o.pos.map((v,i)=>Math.round((v+dv[i])*10)/10);rb(o)}});save();rp();const fb=document.querySelector('#vbar [data-v=fit]');if(fb)fb.click();$('hint').textContent=mv.length+'개를 옮겼습니다 (E '+E+' · N '+N+' · EL '+L+'). 되돌리기: Ctrl+Z'}}
+function rp0(){const o=get(sid),el=$('props');if(!jm&&!bx){const ht=$('hint');if(ml.length>1)ht.textContent=ml.length+'개 선택됨 · 아무 부품이나 끌면 함께 이동 · R: 90° 돌리기 · A: 연결된 것까지 모두 · Ctrl+클릭: 추가·해제 · 빈 곳 클릭: 선택 해제';else if(o)ht.textContent=o.tag+' 선택됨 · A 키: 이 부품과 연결된 배관·부품 모두 선택 · Ctrl+클릭: 하나씩 추가 · 끌기: 이동 · R: 90° 돌리기';else hint()}if(ml.length>1){el.innerHTML=mhtml();return}
  if(!o){el.innerHTML=sj?jhtml(sj):'';return}
  let h='<h4>'+T[o.type].n+'</h4><div class="f"><label>태그</label><input data-k="tag" value="'+o.tag+'"></div>'+(LIN.includes(o.type)?'<div class="f"><label>라인 번호</label><input data-k="ln" value="'+(o.ln||'')+'"></div><div class="f"><label>재질/규격</label><input data-k="spec" placeholder="'+specHint(o)+'" value="'+(o.spec||'').replace(/"/g,'&quot;')+'"></div>':'');
  for(const k of FLD[o.type]){let c;
@@ -807,15 +851,22 @@ $('iso3').hidden=true;$('isop').hidden=true;
 const m=Object.fromEntries(fs.map(f=>[f.id,f]));document.querySelectorAll('.attc').forEach(c=>drawFile(m[c.dataset.fid],c.querySelector('canvas'),260))}
 async function attBig(id){const f=(await fAll()).find(x=>x.id===id);if(!f)return;ov(f.name,`<div class='row'><button data-att='back'>← 목록</button></div><div style='overflow:auto'><canvas id='attbig'></canvas></div>`);$('iso3').hidden=true;$('isop').hidden=true;drawFile(f,$('attbig'),1400)}
 $('bat').onclick=attOpen;
+/* 위쪽 메뉴: 눌러서 열고, 항목을 누르거나 바깥을 누르면 닫힘 */
+document.querySelectorAll('header .menu').forEach(m=>{m.querySelector('.mb').onclick=e=>{e.stopPropagation();const o=m.classList.contains('open');document.querySelectorAll('header .menu.open').forEach(x=>x.classList.remove('open'));if(!o)m.classList.add('open')};m.querySelector('.mp').addEventListener('click',()=>m.classList.remove('open'))});
+document.addEventListener('click',e=>{if(!e.target.closest('header .menu'))document.querySelectorAll('header .menu.open').forEach(x=>x.classList.remove('open'));if(!e.target.closest('#helpp,#bhelp'))$('helpp').hidden=true});
+$('bhelp').onclick=()=>{$('helpp').hidden=!$('helpp').hidden};
+$('biso').onclick=()=>{const o=get(sid)||(ml.length?get(ml[0]):null)||objs.find(x=>LIN.includes(x.type));if(!o){$('hint').textContent='배관이 없습니다. 먼저 배관을 그리거나 ISO 도면을 3D로 바꾸세요.';return}sid=o.id;iso('line')};
+$('bxyz').onclick=()=>{xyzOpen=true;if(!sid&&ml.length<2){$('hint').textContent='📍 좌표에 놓을 부품(배관·밸브·장치 등)을 먼저 클릭하세요. 그러면 오른쪽 속성 아래에 좌표 입력칸이 열립니다.';hl&&0;return}rp();const d=document.querySelector('#props .xyz');if(d){d.open=true;d.scrollIntoView({block:'nearest'})}};
 window.P3D={_rb:o=>rb(o),_scr:id=>{const g=gm[id];if(!g)return null;const c=new THREE.Box3().setFromObject(g).getCenter(V(0,0,0)).project(cam),b=cv.getBoundingClientRect();return[b.left+(c.x+1)/2*b.width,b.top+(1-c.y)/2*b.height]},_scrP:q=>{const c=V(q[0]*S,q[1]*S,q[2]*S).project(cam),b=cv.getBoundingClientRect();return[b.left+(c.x+1)/2*b.width,b.top+(1-c.y)/2*b.height]},_ports:id=>{const o=objs.find(x=>x.id===id);return o?ports(o).map(q=>({n:q.n,p:q.p})):[]},_sel:()=>({sid,ml:ml.slice()}),DEF,T,DIR,VT,IK,SZ,eg,HGx,dflen,keyOf,ports,loadModel,ov,attOpen,fAll,fPut,pdfLib,drawFile,EH,lg,save,
  getObjs:()=>objs,
+ _cam:()=>({dist,tg:tg.toArray(),near:camP.near,pos:cam.position.toArray()}),
  bom:ids=>{const set=objs.filter(o=>ids.includes(o.id)&&LIN.includes(o.type));const js=joints().filter(j=>ids.includes(j.a.id)||ids.includes(j.b.id));return bomItems(set,Object.assign({},DM0),js,ids)},
  removeWhere:pr=>{const rm=objs.filter(pr);rm.forEach(o=>{const g=gm[o.id];if(g){sc.remove(g);g.traverse(c=>{if(c.geometry)c.geometry.dispose()})}delete gm[o.id]});objs=objs.filter(o=>!pr(o));sid=null;ml=[];rgk();hl();rp();save();return rm.length},
  showIso:id=>{sid=id;ml=[];iso('line')},
  focus:ids=>{$('iso').hidden=true;ml=ids.filter(i=>gm[i]);sid=null;hl();rp();const bx=new THREE.Box3();ml.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});if(!bx.isEmpty())camTo({tg:bx.getCenter(new THREE.Vector3()),dist:Math.max(4,bx.getSize(new THREE.Vector3()).length()*1.2)})}};
 $('isob').addEventListener('change',async e=>{if(e.target.id!=='attin')return;const t=Date.now();let i=0;for(const f of e.target.files){await fPut({id:'f'+t+'_'+(i++),job:cur,name:f.name,type:f.type||(/\.pdf$/i.test(f.name)?'application/pdf':''),size:f.size,blob:f,added:t+i})}attOpen()});
 $('isob').addEventListener('click',async e=>{const b=e.target.closest('[data-att]');if(!b)return;const a=b.dataset.att,c=b.closest('.attc');if(a==='del'&&c&&confirm('이 첨부 파일을 삭제할까요?')){await fDel(c.dataset.fid);attOpen()}else if(a==='view')attBig(c.dataset.fid);else if(a==='back')attOpen();else if(window.P3DX){if(a==='wiz')P3DX.wizard(c.dataset.fid);else if(a==='ai')P3DX.convert(c.dataset.fid);else if(a==='table')P3DX.table(c.dataset.fid);else if(a==='aicfg')P3DX.settings();else if(a==='manual')P3DX.manual()}});
-$('isoc').onclick=()=>{$('iso').hidden=true;$('iso3').hidden=false;$('isop').hidden=false};$('iso3').onclick=()=>{$('iso').hidden=true;const ids=isoIds.filter(i=>gm[i]);if(!ids.length)return;ml=ids.slice();sid=null;sj=null;hl();rp();const bx=new THREE.Box3();ids.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});const c=bx.getCenter(new THREE.Vector3()),z=bx.getSize(new THREE.Vector3());tg.copy(c);dist=Math.max(3,z.length()*1.3);yaw=.8;pit=.5};$('isop').onclick=()=>{try{window.print()}catch(e){}};$('isoall').onclick=isoAllPDF;$('bchk').onclick=checkUI;$('bxls').onclick=xlsExport;$('bortho').onclick=()=>orthoUI();$('isob').addEventListener('click',e=>{const b=e.target.closest('[data-orv]');if(b)orthoUI(b.dataset.orv)});$('undo').onclick=undo;$('redo').onclick=redo;$('vbar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v)viewTo(b.dataset.v);else if(b.id==='vort')setOrtho(cam!==camO);else if(b.id==='vcol'){COLM=COLM==='real'?'status':'real';try{localStorage.setItem('p3d_col',COLM)}catch(e){}b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real');objs.forEach(rb);hl()}});{const b=$('vcol');b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real')}$('bclash').onclick=clashUI;$('isob').addEventListener('click',e=>{const tr=e.target.closest('[data-cl]');if(tr)window.P3D.focus(tr.dataset.cl.split(',').map(Number))});$('bj').onclick=jlist;
+$('isoc').onclick=()=>{$('iso').hidden=true;$('iso3').hidden=false;$('isop').hidden=false};$('iso3').onclick=()=>{$('iso').hidden=true;const ids=isoIds.filter(i=>gm[i]);if(!ids.length)return;ml=ids.slice();sid=null;sj=null;hl();rp();const bx=new THREE.Box3();ids.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});const c=bx.getCenter(new THREE.Vector3()),z=bx.getSize(new THREE.Vector3());tg.copy(c);dist=Math.max(.4,z.length()*1.6);yaw=.8;pit=.5};$('isop').onclick=()=>{try{window.print()}catch(e){}};$('isoall').onclick=isoAllPDF;$('bchk').onclick=checkUI;$('bxls').onclick=xlsExport;$('bortho').onclick=()=>orthoUI();$('isob').addEventListener('click',e=>{const b=e.target.closest('[data-orv]');if(b)orthoUI(b.dataset.orv)});$('undo').onclick=undo;$('redo').onclick=redo;$('vbar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v)viewTo(b.dataset.v);else if(b.id==='vort')setOrtho(cam!==camO);else if(b.id==='vcol'){COLM=COLM==='real'?'status':'real';try{localStorage.setItem('p3d_col',COLM)}catch(e){}b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real');objs.forEach(rb);hl()}});{const b=$('vcol');b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real')}$('bclash').onclick=clashUI;$('isob').addEventListener('click',e=>{const tr=e.target.closest('[data-cl]');if(tr)window.P3D.focus(tr.dataset.cl.split(',').map(Number))});$('bj').onclick=jlist;
 $('isob').addEventListener('click',e=>{const g=e.target.closest('[data-cut],[data-ispg],[data-isocut],[data-isocut0]');if(!g||!$('isob').querySelector('.isosh'))return;const d=g.dataset;
  if(d.cut){dm[curKey]=dm[curKey]||{};const c=(dm[curKey].cuts||[]).slice(),i=c.indexOf(d.cut);if(i>=0)c.splice(i,1);else c.push(d.cut);dm[curKey].cuts=c;save();iso(lastIso)}
  else if(d.ispg){isoPg+=+d.ispg;iso(lastIso)}else if(g.hasAttribute('data-isocut0')){if(dm[curKey])dm[curKey].cuts=[];isoPg=0;save();iso(lastIso)}else if(g.hasAttribute('data-isocut')){isoCut=!isoCut;iso(lastIso)}});
@@ -851,7 +902,12 @@ cv.addEventListener('pointermove',e=>{if(!dn)return;if(bx){const b=cv.getBoundin
  lx=e.clientX;ly=e.clientY});
 cv.addEventListener('pointerup',()=>{if(bx){boxSel();dn=null;return}if(dn&&dobj&&dn.moved){rp();lg(dobj.tag+' 위치 이동 → ('+dobj.pos.join(', ')+')')}else if(dn&&!dn.moved&&!dobj)sel(null);dn=null;dobj=null;gs=null;ya=null});
 cv.addEventListener('dblclick',e=>{const id=pick(e);if(typeof id==='number'){sel(id);iso()}});
-cv.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(1,Math.min(150,dist*(1+e.deltaY*.001)))},{passive:false});
+/* 휠 확대·축소: 한 칸마다 같은 비율(마우스·터치패드 차이 보정), 마우스가 가리킨 곳을 향해 확대, 아주 가까이까지 */
+cv.addEventListener('wheel',e=>{e.preventDefault();CA=null;let dy=e.deltaY*(e.deltaMode===1?33:e.deltaMode===2?400:1);dy=Math.max(-120,Math.min(120,dy));
+ const nd=Math.max(.02,Math.min(400,dist*Math.exp(dy*.0018))),k=nd/dist;if(Math.abs(k-1)<1e-4)return;
+ let Pt=null;const ms=Object.values(gm);for(const [ox,oy] of [[0,0],[6,0],[-6,0],[0,6],[0,-6],[12,0],[-12,0],[0,12],[0,-12]]){ray({clientX:e.clientX+ox,clientY:e.clientY+oy});const h=rc.intersectObjects(ms,true)[0];if(h){Pt=h.point;break}}ray(e);
+ if(!Pt){const n=cam.getWorldDirection(V(0,0,0));Pt=rc.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(n,tg),V(0,0,0))}
+ if(Pt){const off=tg.clone().sub(Pt);tg.copy(Pt).addScaledVector(off,k)}dist=nd},{passive:false});
 
 pal();jload();
 try{const d=JSON.parse(localStorage.getItem('p3d')||'null');if(d&&!jobs.length&&(d.objs||[]).length){const id='j'+Date.now();jobs.push({id,name:'이전 작업',created:Date.now(),updated:Date.now(),n:d.objs.length});jidx();localStorage.setItem('p3d_job_'+id,JSON.stringify(d))}}catch(e){} // 예전 버전 데이터 → '이전 작업'

@@ -16,7 +16,7 @@
   const DIRS = ['+X', '-X', '+Y', '-Y', '+Z', '-Z'];
   // 방향 키 → 사람 말 (경사 방향 포함)
   const DN = { '+X': '동', '-X': '서', '+Z': '남', '-Z': '북', '+Y': '위', '-Y': '아래' };
-  const dirName = k => String(k || '').match(/[+-][XYZ]/g)?.map(x => DN[x]).join('') + (/[XYZ].*[XYZ]/.test(k) ? ' 45°' : '') || k;
+  const dirName = k => (String(k || '').match(/[+-][XYZ]/g) || []).map(x => DN[x]).join('·') + (/[XYZ].*[XYZ]/.test(k) ? ' 사이' : '') || k;
   const DIRL = { '+X': '+X (오른쪽 아래)', '-X': '-X (왼쪽 위)', '+Y': '+Y (위)', '-Y': '-Y (아래)', '+Z': '+Z (왼쪽 아래)', '-Z': '-Z (오른쪽 위·북)' };
   const STEP = {
     elbow: '엘보 (꺾임)', flange: '플랜지 조인트', valve: '밸브', tee: '티 (분기)', tee_in: '티 (분기로 들어옴)',
@@ -196,10 +196,10 @@ RULES
             const dt = P.DIR[d].dot(P.DIR[p.to]);
             let t;
             if (Math.abs(dt) < 0.01) t = mk('elbow', { pos: [0, 0, 0], axis: d, turn: p.to, nps: st.nps });
-            else if (Math.abs(dt - Math.SQRT1_2) < 0.01) { // 45° 꺾임 (경사·롤링 배관)
-              const tv = P.DIR[p.to].clone().addScaledVector(P.DIR[d], -dt).normalize();
-              t = mk('elbow', { pos: [0, 0, 0], axis: d, turn: P.keyOf(tv), nps: st.nps, kind: 'lr45' });
-            } else { errs.push({ ri, si, msg: '꺾이는 각도가 90°·45°가 아님' }); return; }
+            else if (dt > 0.02 && dt < 0.999) { // 90°가 아닌 꺾임 (경사 배관) — 45°는 45° 엘보, 그 밖은 각도 맞춤 엘보
+              const tv = P.DIR[p.to].clone().addScaledVector(P.DIR[d], -dt).normalize(), an = Math.acos(dt) * 180 / Math.PI;
+              t = mk('elbow', Object.assign({ pos: [0, 0, 0], axis: d, turn: P.keyOf(tv), nps: st.nps }, Math.abs(an - 45) < 0.3 ? { kind: 'lr45' } : { kind: 'lr90', ang: Math.round(an * 10) / 10 }));
+            } else { errs.push({ ri, si, msg: '꺾이는 각도가 90°보다 큼 (되돌아감)' }); return; }
             const e = P.eg(t), k = e.R * Math.tan(e.th / 2);
             t.pos = R1(add3(C, d, -k)); pipeTo(t.pos, si);
             st.cur = add3(C, p.to, k); st.cen = C; st.dir = p.to; break;
@@ -699,10 +699,26 @@ RULES
   // 배관이 없는 '부품 맞붙임' 구간 → ASME B16.9(엘보·티 중심~끝) + B16.5(플랜지) 치수로 길이를 자동으로 넣는다
   // 이 구간이 경사(롤링) 구간인가 → 그 경사 정보
   function rollOf(ri, si) { const r = W.R.runs[ri], s = r.steps[si]; if (!s || !s.rollSeg) return null; const pv = si > 0 ? r.steps[si - 1] : r; return pv.roll && pv.roll.pl !== 'AX' ? pv.roll : null; }
-  function fitHalf(kind, n, e45) {
+  // 롤링: 면(pl)과 두 변 길이로 3D 방향 벡터
+  const AXE = { X: '+X', Y: '+Y', Z: '+Z' }, AXW = { X: '동서', Y: '위아래', Z: '남북' };
+  function rollVec(rl, pl, legs) { const g = rl.pq && rl.pq[pl]; if (!g) return null; const la = legs ? legs[0] : Math.abs(g.a), lb = legs ? legs[1] : Math.abs(g.b);
+    return P.DIR[AXE[g.p]].clone().multiplyScalar(Math.sign(g.a || 1) * la).add(P.DIR[AXE[g.q]].clone().multiplyScalar(Math.sign(g.b || 1) * lb)); }
+  const angOf = (k, v) => { const a = P.DIR[k], u = v.clone().normalize(); return Math.round(Math.acos(Math.max(-1, Math.min(1, a.dot(u)))) * 1800 / Math.PI) / 10; };
+  function dirBefore(ri, si) { const r = W.R.runs[ri]; let d = r.dir; for (let i = 0; i < si; i++) { const x = r.steps[i]; if (x.t === 'elbow' && x.to) d = x.to; if (x.t === 'tee_in' && x.run) d = x.run; } return d; }
+  const elbName = a => (Math.abs(a - 90) < 1 ? '90° 엘보' + ' (롤링)' : Math.abs(a - 45) < 1 ? '45° 엘보' : '약 ' + Math.round(a) + '° 엘보');
+  // 도면 BOM의 엘보 각도별 개수
+  function bomElb() { if (!W.bom) return null; const c = { 90: 0, 45: 0 }; W.bom.rows.forEach(x => { if (x.cat !== 'ELBOW') return; const a = /45/.test((x.code || '') + ' ' + (x.desc || '')) ? 45 : 90; c[a] += +x.qty || 0; }); return c; }
+  // 롤 구간 방향이 정해지면 앞뒤 엘보 각도 갱신
+  function rollApply(ri, si, vec) {
+    const r = W.R.runs[ri], el = si > 0 ? r.steps[si - 1] : null, seg = r.steps[si];
+    const key = P.keyOf(vec);
+    if (el && el.t === 'elbow') { el.to = key; const din = dirBefore(ri, si - 1); if (din) el.eang = angOf(din, vec); } else if (!el) r.dir = key;
+    if (seg && seg.t === 'elbow' && seg.to) seg.eang = angOf(seg.to, vec);
+  }
+  function fitHalf(kind, n, eang) {
     const R = W.R, cls = +R.cls || 150;
     const ce = [.5, .75, 1, 1.5, 2].includes(+n) ? (R.ce || 'sw') : 'bw';
-    if (kind === 'elbow') { const e = P.eg({ type: 'elbow', kind: e45 ? 'lr45' : 'lr90', nps: n, ce, axis: '+X', turn: '+Y', pos: [0, 0, 0] }); return e45 ? e.R * Math.tan(e.th / 2) : e.R; }
+    if (kind === 'elbow') { const e = P.eg({ type: 'elbow', kind: 'lr90', nps: n, ce, axis: '+X', turn: '+Y', pos: [0, 0, 0] }); const a = +eang || 90; return Math.abs(a - 90) < 0.5 ? e.R : (Math.abs(a - 45) < 0.5 ? P.eg({ type: 'elbow', kind: 'lr45', nps: n, ce, axis: '+X', turn: '+Y', pos: [0, 0, 0] }).R : e.R) * Math.tan(a * Math.PI / 360); }
     if (kind === 'tee' || kind === 'tee_in') return P.dflen({ type: 'tee', nps: n, ce }) / 2;
     if (kind === 'flange') return P.HGx(cls, 'RF', n) + P.dflen({ type: 'flange', nps: n, kind: 'wn', cls });
     if (kind === 'weld') return 0;
@@ -712,13 +728,15 @@ RULES
     const R = W.R; if (!R.nps) return;
     R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
       if (s.okLen || !s._wd || !(s._pt < 15)) return;
+      const pv0 = si > 0 ? r.steps[si - 1] : null;
+      if (s.rollSeg || (s.e45 && s.eang == null) || (pv0 && pv0.e45 && pv0.eang == null)) return; // 경사 구간 각도가 정해진 뒤에
       if (s._wd.some(t => t > 0.12 && t < 0.88)) return; // 사이에 용접점이 있으면 배관이 있음 → 물어봄
       if (['flange', 'valve'].includes(s.t) && !s.okType) return;
       const n = npsAt(ri, si);
       const a = si === 0 ? (r.start && r.start.tee ? 'tee' : (s._wd.some(t => t <= 0.12) ? 'weld' : null)) : r.steps[si - 1].t;
       const b = s.t === 'end' ? (s._wd.some(t => t >= 0.88) ? 'weld' : null) : s.t;
       if (![a, b].some(k => k === 'elbow' || k === 'tee' || k === 'tee_in')) return;
-      const pa = si > 0 ? r.steps[si - 1] : null, ha = fitHalf(a, n, pa && pa.e45), hb = fitHalf(b, n, s.e45); if (ha == null || hb == null) return;
+      const pa = si > 0 ? r.steps[si - 1] : null, ha = fitHalf(a, n, pa && pa.eang), hb = fitHalf(b, n, s.eang); if (ha == null || hb == null) return;
       s.d = Math.round((ha + hb) * 10) / 10; s.okLen = true; s.auto = 'fit'; delete s.est; delete s.conf;
     }));
   }
@@ -726,7 +744,8 @@ RULES
   function ocrApply() {
     W.R.runs.forEach(r => r.steps.forEach(s => {
       if (s.okLen || !s.ocr || s.ocr.c < 90 || s.ocr.amb) return;
-      if (s.ocr.off) { s.off = s.ocr.v; s.d = Math.round(s.ocr.v * Math.SQRT2 * 10) / 10; } else s.d = s.ocr.v;
+      if (s.rollSeg) return; // 경사 구간은 두 변을 직접 확인
+      s.d = s.ocr.v;
       s.okLen = true; s.auto = 'ocr'; delete s.est; delete s.conf;
     }));
   }
@@ -863,7 +882,7 @@ RULES
       const n = R.runs.reduce((a, x) => a + x.steps.length, 0);
       title = '질문이 끝났습니다.';
       const na = R.runs.reduce((a, x) => a + x.steps.filter(y => y.auto === 'fit').length, 0);
-      body = wReview() + `${na ? '<p>엘보·티가 플랜지나 용접점에 바로 붙은 구간 <b>' + na + '곳</b>은 길이를 묻지 않고 ASME B16.9/B16.5 치수로 넣었습니다.</p>' : ''}<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
+      body = wElbCheck() + wReview() + `${na ? '<p>엘보·티가 플랜지나 용접점에 바로 붙은 구간 <b>' + na + '곳</b>은 길이를 묻지 않고 ASME B16.9/B16.5 치수로 넣었습니다.</p>' : ''}<p>답하신 내용으로 3D를 만듭니다. 도면에 있는데 빠진 부품(티, 레듀서 등)은 나중에 3D 편집기에서 추가하거나 "고급 편집"에서 넣을 수 있습니다.</p><div class="wzb">${btn('build', '3D로 만들기', 'pri big')}</div>`;
       pts = R.runs.flatMap(x => [x._p0].concat(x.steps.map(y => y._p))).filter(Boolean);
     } else if (s) {
       const prev = q.si === 0 ? r._p0 : r.steps[q.si - 1]._p;
@@ -872,9 +891,17 @@ RULES
         pts = [s._p, nx && nx._p].filter(Boolean); mode = 'seg';
         const PLK = { H: '수평 경사 — 바닥면에서 비스듬히 (동서↔남북)', VX: '수직 경사 — 동서 방향으로 비스듬히 오르내림', VZ: '수직 경사 — 남북 방향으로 비스듬히 오르내림', AX: '경사 아님 — 축 방향 그대로' };
         const why = rl.isoLook ? '선은 축 방향처럼 보이지만 옆에 빗금 삼각형이 있어 45° 경사로 봅니다' : rl.sure ? '빗금 삼각형으로 보아 "' + PLK[rl.pl].split(' —')[0] + '" 같습니다' : '빗금 삼각형을 못 찾았습니다 — 도면을 보고 골라 주세요';
-        title = branchNote + '파란 띠 구간이 비스듬한 배관(경사·롤링)입니다. 어느 면에서 기울었나요? <span class="wzt wzto">' + why + (Math.abs((rl.ang || 45) - 45) > 12 ? ` · 그림 비율로는 약 ${rl.ang}° (45° 엘보로 만듭니다)` : '') + '</span>';
-        body = `<div class="wzb">${Object.keys(rl.alts).map(k => btn('roll:' + k, PLK[k] + ' <span class="mut">(' + E(dirName(rl.alts[k])) + ')</span>', rl.pl === k ? 'on' : (k === 'AX' ? 'ghost' : ''))).join('')}</div>
-<p class="mut">빗금 삼각형: 바닥에 눕힌 삼각형 = 수평 경사, 세운 삼각형 = 수직 경사. 다음 질문에서 삼각형 한 변(오프셋) 길이를 넣으면 45° 대각 길이로 계산합니다.</p>`;
+        const din = dirBefore(q.ri, q.si), ea = {};
+        Object.keys(rl.pq || {}).forEach(k => { const v = rollVec(rl, k); if (v && din) ea[k] = angOf(din, v); });
+        const be = bomElb(); let pick = rl.pl, bnote = '';
+        if (be && !s.rollPick) { // 도면 BOM에 45° 엘보가 없으면 90° 엘보(롤링)가 되는 면을 우선
+          if (!be[45] && ea[pick] != null && Math.abs(ea[pick] - 90) > 1) { const k90 = Object.keys(ea).find(k => Math.abs(ea[k] - 90) < 1); if (k90) { pick = k90; bnote = ` · 도면 BOM에 45° 엘보가 없어 90° 엘보(롤링)가 되는 면을 골라 두었습니다`; } }
+          else if (be[45] && !rl.sure) { const k45 = Object.keys(ea).find(k => Math.abs(ea[k] - 45) < 8); if (k45) pick = k45; }
+          s.rollPick = pick;
+        } else if (s.rollPick) pick = s.rollPick;
+        title = branchNote + '파란 띠 구간이 비스듬한 배관(경사·롤링)입니다. 어느 면에서 기울었나요? <span class="wzt wzto">' + why + bnote + '</span>';
+        body = `<div class="wzb">${Object.keys(rl.alts).map(k => btn('roll:' + k, PLK[k] + ' <span class="mut">(' + E(dirName(rl.alts[k])) + (ea[k] != null ? ' · ' + elbName(ea[k]) : '') + ')</span>', pick === k ? 'on' : (k === 'AX' ? 'ghost' : ''))).join('')}</div>
+<p class="mut">빗금 삼각형: 바닥에 눕힌 삼각형 = 수평 경사, 세운 삼각형 = 수직 경사. 들어오는 배관과 직각인 면이면 <b>90° 엘보를 돌려서(롤링)</b> 붙이고, 같은 면이면 45° 등 각도 엘보입니다. 다음 질문에서 삼각형 두 변 길이를 넣으면 정확한 각도로 만듭니다.${be ? `<br>도면 BOM 엘보: 90° ${be[90]}개 · 45° ${be[45]}개` : ''}</p>`;
       } else if (q.phase === 'type') {
         pts = [s._p];
         const lg = symGuess(q.ri, q.si, 'type'), gv = lg ? lg.v : s.vguess;
@@ -904,8 +931,11 @@ RULES
         const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
         const rlg = rollOf(q.ri, q.si);
         const oc = s.ocr;
-        title = branchNote + (rlg ? `비스듬한 구간(→ ${what}): 빗금 삼각형 한 변(오프셋) 길이는 몇 mm 인가요? <span class="wzt">45°이므로 대각 길이 = 변 × 1.414 로 자동 계산</span>` : `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?`) + (oc ? ` <span class="wzt wzto">도면에서 읽은 값 <b>${oc.v}</b> (확신 ${oc.c}%)${oc.amb ? ' · 근처에 다른 숫자도 있음' : ''} — 맞으면 다음, 틀리면 고치세요</span>` : '');
-        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" value="${oc ? oc.v : ''}" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
+        const g = rlg && rlg.pq && rlg.pq[rlg.pl];
+        title = branchNote + (g ? `비스듬한 구간(→ ${what}): 빗금 삼각형의 두 변 길이는 몇 mm 인가요?` : `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?`) + (oc ? ` <span class="wzt wzto">도면에서 읽은 값 <b>${oc.v}</b> (확신 ${oc.c}%)${oc.amb ? ' · 근처에 다른 숫자도 있음' : ''} — 맞으면 다음, 틀리면 고치세요</span>` : '');
+        body = g ? `<div class="row wzs"><label>${AXW[g.p]} 변 <input id="wzl1" type="number" inputmode="numeric" placeholder="예: 80" value="${s.legs ? s.legs[0] : oc ? oc.v : ''}" style="font-size:20px;width:150px"></label><label>${AXW[g.q]} 변 <input id="wzl2" type="number" inputmode="numeric" placeholder="같으면 비워 두기" value="${s.legs ? s.legs[1] : ''}" style="font-size:20px;width:150px"></label><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (그림 비율 사용)', 'ghost')}</div>
+        <p class="mut">한 변만 적혀 있으면 다른 칸은 비워 두세요 (두 변이 같다고 봄). 대각 길이 = √(변² + 변²), 엘보 각도도 두 변으로 계산합니다.</p>
+        <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>` : `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" value="${oc ? oc.v : ''}" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
@@ -934,12 +964,20 @@ RULES
   const WHAT = { elbow: '엘보', flange: '플랜지', valve: '밸브', tee: '티', tee_in: '티(만남)', reducer: '레듀서', end: '끝', equip: '장치', inst: '계기' };
   const SRC = { ocr: ['도면 읽음', 'ok'], 'ocr-ok': ['도면 읽음·확인', 'ok'], fit: ['ASME 자동', 'fit'], user: ['직접 입력', 'us'], est: ['어림값', 'bad'] };
   // 끝 화면: 구간별 길이와 그 출처를 한눈에 보고 바로 고치기
+  // 만들기 전에: 엘보 개수·각도를 도면 BOM과 비교
+  function wElbCheck() {
+    const be = bomElb(); if (!be) return '';
+    const c = { 90: 0, 45: 0, x: 0 };
+    W.R.runs.forEach(r => r.steps.forEach(x => { if (x.t !== 'elbow') return; const a = +x.eang || 90; if (Math.abs(a - 90) < 1) c[90]++; else if (Math.abs(a - 45) < 1) c[45]++; else c.x++; }));
+    const ok = c[90] === be[90] && c[45] === be[45] && !c.x;
+    return `<p class="${ok ? '' : 'wzocrb'}" style="margin:4px 0 8px">${ok ? '✓' : '⚠'} 엘보: 지금 경로 90° <b>${c[90]}</b> · 45° <b>${c[45]}</b>${c.x ? ' · 각도 맞춤 <b>' + c.x + '</b>' : ''} — 도면 BOM 90° <b>${be[90]}</b> · 45° <b>${be[45]}</b>${ok ? ' (같음)' : ' — 다릅니다. 경사 구간의 면(수평/수직)이나 빠진 꺾임을 확인하세요. 엘보는 크기별로 BOM에 따로 적혀 있을 수 있습니다.'}</p>`;
+  }
   function wReview() {
     const rows = [];
     W.R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
       const src = SRC[s.auto] || (s.est ? SRC.est : SRC.user);
       const oc = s.ocr && s.auto !== 'ocr' && s.auto !== 'ocr-ok' && +s.ocr.v !== +s.d ? ` <span class="mut">(도면: ${s.ocr.v})</span>` : '';
-      rows.push(`<tr data-wzrow="${ri}.${si}"><td>${ri + 1}-${si + 1}</td><td>${WHAT[s.t] || s.t}${s.rollSeg && s.off ? ' <span class="mut">(경사: 변 ' + s.off + ' → 대각)</span>' : s.rollSeg ? ' <span class="mut">(경사 대각)</span>' : ''}</td><td><input data-wzlen="${ri}.${si}" type="number" value="${E(String(s.d))}"> mm${oc}</td><td><span class="wzsrc ${src[1]}">${src[0]}${s.auto === 'ocr' ? ' ' + s.ocr.c + '%' : ''}</span></td></tr>`);
+      rows.push(`<tr data-wzrow="${ri}.${si}"><td>${ri + 1}-${si + 1}</td><td>${WHAT[s.t] || s.t}${s.rollSeg && s.legs ? ' <span class="mut">(경사: 변 ' + s.legs.join('·') + ' → 대각)</span>' : s.rollSeg ? ' <span class="mut">(경사 대각)</span>' : ''}${s.t === 'elbow' && s.eang && Math.abs(s.eang - 90) > 0.5 ? ' <span class="mut">' + s.eang + '°</span>' : ''}</td><td><input data-wzlen="${ri}.${si}" type="number" value="${E(String(s.d))}"> mm${oc}</td><td><span class="wzsrc ${src[1]}">${src[0]}${s.auto === 'ocr' ? ' ' + s.ocr.c + '%' : ''}</span></td></tr>`);
     }));
     const cnt = k => W.R.runs.reduce((a, r) => a + r.steps.filter(s => k.includes(s.auto || (s.est ? 'est' : 'user'))).length, 0);
     const no = cnt(['ocr', 'ocr-ok']), ne = cnt(['est']);
@@ -1067,8 +1105,10 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     if ((k === 'type' || k === 'end') && s) symLearn(q.ri, q.si, k, v);
     if (k === 'roll') {
       const r0 = W.R.runs[q.ri], nx = r0.steps[q.si + 1];
-      s.roll.pl = v; s.to = s.roll.alts[v]; s.okRoll = true;
-      const flat = v === 'AX'; s.e45 = !flat; if (nx) { nx.rollSeg = !flat; if (nx.t === 'elbow') nx.e45 = !flat; if (flat && nx.off) { delete nx.off; } }
+      s.roll.pl = v; s.okRoll = true; s.rollPick = v;
+      const flat = v === 'AX';
+      if (flat) { s.to = s.roll.alts.AX; delete s.eang; delete s.e45; if (nx) { nx.rollSeg = false; delete nx.eang; delete nx.e45; delete nx.legs; } }
+      else { if (nx) nx.rollSeg = true; rollApply(q.ri, q.si + 1, rollVec(s.roll, v, nx && nx.legs)); }
       wAdvance(); wRender(); return;
     }
     if (k === 'size') { W.sizeAns = true; R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
@@ -1089,7 +1129,14 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
       } else { s.nps2 = +v; s.okBranch = true; R.runs.forEach(x => { if (x.start && x.start.tee === s.id) x.nps = +v; }); wAdvance(); }
     }
     else if (k === 'len') {
-      if (v !== 'skip') { const el = $('wzd'), n = +(el && el.value); if (!(n > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '숫자를 입력해 주세요. 치수가 안 보이면 "치수가 안 보임"을 누르세요.'; return; } if (rollOf(q.ri, q.si)) { s.off = n; s.d = Math.round(n * Math.SQRT2 * 10) / 10; } else { delete s.off; s.d = n; } delete s.conf; delete s.est; s.auto = s.ocr && +s.ocr.v === n ? 'ocr-ok' : 'user'; } else s.auto = 'est';
+      const rlg = rollOf(q.ri, q.si);
+      if (rlg && $('wzl1')) {
+        if (v !== 'skip') { let a1 = +$('wzl1').value, a2 = +$('wzl2').value; if (!(a1 > 0) && a2 > 0) a1 = a2; if (!(a2 > 0)) a2 = a1; if (!(a1 > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '변 길이를 넣어 주세요.'; return; }
+          s.legs = [a1, a2]; const vec = rollVec(rlg, rlg.pl, s.legs); s.d = Math.round(vec.length() * 10) / 10; rollApply(q.ri, q.si, vec); s.auto = 'user'; delete s.est; delete s.conf; }
+        else { const vec = rollVec(rlg, rlg.pl); rollApply(q.ri, q.si, vec); s.auto = 'est'; }
+        s.okLen = true; wAdvance(); wRender(); return;
+      }
+      if (v !== 'skip') { const el = $('wzd'), n = +(el && el.value); if (!(n > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '숫자를 입력해 주세요. 치수가 안 보이면 "치수가 안 보임"을 누르세요.'; return; } s.d = n; delete s.conf; delete s.est; s.auto = s.ocr && +s.ocr.v === n ? 'ocr-ok' : 'user'; } else s.auto = 'est';
       s.okLen = true; wAdvance();
     }
     else if (k === 'end') {
@@ -1134,14 +1181,16 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     await wBuild();
   }
   // 도면 BOM ↔ 3D 자재 비교
-  const CATK = { PIPE: '배관', ELBOW: '엘보', TEE: '티', REDUCER: '레듀서', CAP: '캡', FLANGE: '플랜지', 'BLIND FLANGE': '블라인드 플랜지', GASKET: '가스켓', 'STUD/BOLT': '스터드 볼트', 'GATE V/V': '게이트 밸브', 'GLOBE V/V': '글로브 밸브', 'CHECK V/V': '체크 밸브', 'BALL V/V': '볼 밸브', 'BFLY V/V': '버터플라이 밸브', 'PLUG V/V': '플러그 밸브', 'CONTROL V/V': '제어 밸브', VALVE: '밸브', NIPPLE: '니플', 'SWAGE NIPPLE': '스웨지 니플', COUPLING: '커플링', STRAINER: '스트레이너', UNION: '유니언', OLET: '올렛' };
+  const CATK = { PIPE: '배관', 'ELBOW 90': '90° 엘보', 'ELBOW 45': '45° 엘보', 'ELBOW X': '각도 맞춤 엘보 (도면 BOM과 확인)', ELBOW: '엘보', TEE: '티', REDUCER: '레듀서', CAP: '캡', FLANGE: '플랜지', 'BLIND FLANGE': '블라인드 플랜지', GASKET: '가스켓', 'STUD/BOLT': '스터드 볼트', 'GATE V/V': '게이트 밸브', 'GLOBE V/V': '글로브 밸브', 'CHECK V/V': '체크 밸브', 'BALL V/V': '볼 밸브', 'BFLY V/V': '버터플라이 밸브', 'PLUG V/V': '플러그 밸브', 'CONTROL V/V': '제어 밸브', VALVE: '밸브', NIPPLE: '니플', 'SWAGE NIPPLE': '스웨지 니플', COUPLING: '커플링', STRAINER: '스트레이너', UNION: '유니언', OLET: '올렛' };
   function bomCompare(bom, items) {
     const O = window.P3DOCR, rows = {}, key = (c, z, z2) => c + '|' + (z == null ? '?' : z) + (z2 ? 'x' + z2 : '');
     const put = (c, z, z2, side, q) => { if (!c) return; const k = key(c, z, z2); const r = rows[k] = rows[k] || { c, z, z2, d: 0, m: 0, dn: 0 }; if (side === 'd' && (q == null || isNaN(q))) r.nq = 1; else r[side] += q || 0; if (side === 'd') r.dn++; };
-    bom.rows.forEach(r => put(r.cat, r.size, r.cat === 'REDUCER' ? r.size2 : null, 'd', r.qty == null ? NaN : r.qty));
+    const ek = (c, t) => c !== 'ELBOW' ? c : /롤링/.test(t) ? 'ELBOW X' : /45/.test(t) ? 'ELBOW 45' : 'ELBOW 90'; // 엘보는 각도별로
+    bom.rows.forEach(r => put(ek(r.cat, (r.code || '') + ' ' + (r.desc || '')), r.size, r.cat === 'REDUCER' ? r.size2 : null, 'd', r.qty == null ? NaN : r.qty));
     (items || []).forEach(it => {
       if (it.code === 'PIPE SUPPORT') return;
       let c = /STRAINER/.test(it.code) ? 'STRAINER' : O.catOf(it.code); if (!c) return;
+      c = ek(c, it.desc || '');
       const sz = String(it.size || ''), parts = sz.split('X');
       let z = O.sizeNum(parts[0]), z2 = null;
       if (c === 'REDUCER' && parts[1]) z2 = O.sizeNum(parts[1]);
