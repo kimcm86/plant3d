@@ -703,7 +703,7 @@ RULES
       if (s.t === 'flange') fl += 2; else if (s.t === 'valve' && (s.conn || 'flg') === 'flg') fl += 2;
       else if (s.t === 'end' && (s.okEnd || s.guess)) { const en = s.okEnd ? s.end : s.guess; if (en === 'cap') cap++; else if (en === 'blind') { bl++; fl++; } else if (en === 'flange') fl++; }
     }); });
-    if (q(/^CAP$/) > cap) return 'cap';
+    if (q(/^CAP$/) > cap && !W.R.runs[ri].steps[si].flTick) return 'cap'; // 플랜지 표시가 있는 끝은 캡이 아님
     const me = W.R.runs[ri].steps[si], tickElse = !me.flTick && W.R.runs.some((r, i) => r.steps.some((x, j) => (i !== ri || j !== si) && x.t === 'end' && !x.okEnd && x.flTick && eq(npsAt(i, j))));
     if (q(/^BLIND FLANGE$/) > bl && !(tickElse && q(/^FLANGE$/) - fl >= 1)) return 'blind'; // 블라인드는 끝에 플랜지 표시가 있는 쪽에 먼저
     if (q(/^FLANGE$/) - fl >= 1) return 'flange';
@@ -812,7 +812,7 @@ RULES
       // 3) 도면 BOM 표
       try { w0.bom = await O.readBOM(segs, page, words, say); } catch (e) { w0.bom = null; }
       // 4) 아이소 방향 글자: 다른 장 표시(SEE DWG SHT 2/3)·좌표(E/N/EL) — 힌트로만 사용
-      try { say('다른 장 표시·좌표 찾는 중…'); const iso = await O.readIsoText(segs, page, { vars: [[-30, -0.577], [30, 0.577], [-30, 0.577], [30, -0.577]], wl: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./()-+:=# ' }); w0.see = O.seeSheets(iso); w0.coords = O.coordsOf(iso); } catch (e) { w0.see = []; w0.coords = []; }
+      try { say('다른 장 표시·좌표 찾는 중…'); const iso = await O.readIsoText(segs, page, { vars: [[-30, -0.577], [30, 0.577], [-30, 0.577], [30, -0.577]], wl: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./()-+:=#" ' }); w0.isoTxt = iso; w0._szl = null; w0.see = O.seeSheets(iso); w0.coords = O.coordsOf(iso); } catch (e) { w0.see = []; w0.coords = []; }
       w0.ocrRun = false;
       if (W !== w0) return;
       if (W.q.phase === 'done') { if (live()) wRender(); }
@@ -968,9 +968,10 @@ RULES
       } else if (q.phase === 'branch') {
         pts = [s._p];
         title = branchNote + '여기서 배관이 갈라집니다. 갈라지는 쪽 배관 크기는?';
-        const cur = npsAt(q.ri, q.si), bz = bomSmaller(cur, false);
-        if (bz != null) title += ` <span class="wzt">도면 BOM에 ${nf(bz)} 자재가 있습니다</span>`;
-        body = `<div class="wzb">${btn('br:' + cur, '같은 크기 (' + nf(cur) + ')', bz == null ? 'on' : '')}${QS.filter(v => v < cur).reverse().map(v => btn('br:' + v, nf(v), v === bz ? 'on' : '')).join('')}${btn('br:none', '갈라지는 곳 아님', 'ghost')}</div>`;
+        const cur = npsAt(q.ri, q.si), lz = labelBranch(s.id), bz = lz != null && lz <= cur ? lz : bomSmaller(cur, false);
+        if (lz != null && lz <= cur) title += ` <span class="wzt wzto">도면의 가지 배관에 ${nf(lz)} 표기가 있습니다</span>`;
+        else if (bz != null) title += ` <span class="wzt">도면 BOM에 ${nf(bz)} 자재가 있습니다</span>`;
+        body = `<div class="wzb">${btn('br:' + cur, '같은 크기 (' + nf(cur) + ')', bz == null || Math.abs(bz - cur) < 0.01 ? 'on' : '')}${QS.filter(v => v < cur).reverse().map(v => btn('br:' + v, nf(v), v === bz ? 'on' : '')).join('')}${btn('br:none', '갈라지는 곳 아님', 'ghost')}</div>`;
       } else if (q.phase === 'len') {
         pts = [prev, s._p]; mode = 'seg';
         const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
@@ -981,7 +982,7 @@ RULES
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
-        const le = symGuess(q.ri, q.si, 'end'), bg0 = !le && s.guess !== 'cap' ? bomEndGuess(q.ri, q.si) : null, bg = bg0 && (!s.guess || (s.flTick && (bg0 === 'cap' || bg0 === 'blind'))) ? bg0 : null, ge = le ? le.v : bg || s.guess;
+        const le = symGuess(q.ri, q.si, 'end'), bg0 = !le && s.guess !== 'cap' ? bomEndGuess(q.ri, q.si) : null, bg = bg0 && (!s.guess || (s.flTick && bg0 === 'blind')) ? bg0 : null, ge = le ? le.v : bg || s.guess;
         const eg = le ? '지난번 비슷한 모양을 "' + (ENDK[le.v] || le.v) + '"(으)로 고르셨습니다' : bg ? '도면 BOM에 아직 안 쓴 ' + ({ cap: '캡', blind: '블라인드 플랜지', flange: '플랜지' }[bg]) + '가 있습니다' : s.flTick ? '끝에 플랜지 표시가 보입니다 — 다른 장·장치와 맞대는 면' : { cap: '캡 모양(ㄷ)이 보입니다', flange: '밸브 바로 끝 — 플랜지로 계기·장치에 연결될 가능성' }[s.guess];
         title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?' + (eg ? ' <span class="wzt' + (le ? ' wzto' : '') + '">' + E(eg) + '</span>' : '');
         const eo = v => (ge === v ? 'on' : '');
@@ -1155,8 +1156,8 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     }
     if (k === 'slope') {
       const rl = s.roll, g = rl.pq[rl.pl]; let legs = null;
-      if (v === '45') legs = [1, 1];
-      else if (v === 'fig') legs = [Math.abs(g.a), Math.abs(g.b)];
+      s.slopeFig = false; if (v === '45') legs = [1, 1];
+      else if (v === 'fig') { legs = [Math.abs(g.a), Math.abs(g.b)]; s.slopeFig = true; }
       else { let a1 = +$('wzl1').value, a2 = +$('wzl2').value, an = +$('wzla').value;
         if (a1 > 0 || a2 > 0) { if (!(a1 > 0)) a1 = a2; if (!(a2 > 0)) a2 = a1; legs = [a1, a2]; s.rollLegs = [a1, a2]; }
         else if (an > 0 && an < 90) { legs = [Math.cos(an * Math.PI / 180), Math.sin(an * Math.PI / 180)]; s.rollDeg = an; }
@@ -1168,13 +1169,13 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     }
     if (k === 'size') { W.sizeAns = true; R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
     else if (k === 'type') {
-      if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
+      if (v === 'none') { (W.dropped = W.dropped || []).push({ at: (q.ri + 1) + '-' + (q.si + 1), z: npsAt(q.ri, q.si) }); const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
       else { if (v === 'flange') { s.t = 'flange'; delete s.vt; } else { s.t = 'valve'; s.vt = v; s.conn = 'flg'; } s.okType = true; wAdvance(); }
     }
     else if (k === 'vs') { s.vnps = +v; s.okVsize = true; wAdvance(); }
     else if (k === 'rt') { W.hist.pop(); s.rt = v; wRender(); return; }
     else if (k === 'rs') {
-      if (v === 'none') { const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
+      if (v === 'none') { (W.dropped = W.dropped || []).push({ at: (q.ri + 1) + '-' + (q.si + 1), z: npsAt(q.ri, q.si) }); const nx = r.steps[q.si + 1]; if (nx) { nx.d = (+nx.d || 0) + (+s.d || 0); nx.okLen = false; } r.steps.splice(q.si, 1); W.q.phase = null; wFirstPhase(); }
       else { s.nps2 = +v; s.rt = s.rt || 'conc'; s.okRed = true; wAdvance(); }
     }
     else if (k === 'br') {
@@ -1343,15 +1344,16 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     P.ov('3D로 바꾸기 — 완료', `<div class="wz"><h3 class="wzq">3D를 만들었습니다 (부품 ${b.objs.length}개).</h3>
 ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 있습니다 (예: 앞 부품과 길이가 겹침). 3D를 보고 이상하면 "이전 단계로" 돌아가 길이를 고치거나, 고급 편집에서 확인하세요.</p>` : ''}
 <div class="wzb"><button data-wz="see3d" class="pri big">3D로 보기</button><button data-wz="seeiso" class="big">원본 ↔ 다시 만든 ISO 나란히</button></div>
-<div id="wzjoin"></div><div id="wzbom"></div>
+<div id="wzjoin"></div><div id="wzrv"></div><div id="wzbom"></div>
 <div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button>${B && !B.run && W.batchI != null ? '<button data-bt="res">← 일괄 변환 결과</button>' : ''}<span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
     W.built = ids; W.atBuild = true;
     try { W.clsCode = P.clsAuto ? P.clsAuto(ids) : null; } catch (e) { W.clsCode = null; }
     wJoinUI();
+    rvShow();
     if (!W.auto) accSave(W);
     const bx = $('wzbom'); if (bx) { bx.innerHTML = wBomSec(); bx.onchange = e => { const t = e.target.closest('[data-bq]'); if (!t) return; const [i, k] = t.dataset.bq.split(':'), row = W.bom.rows[+i]; const v = t.value; row[k] = k === 'cat' ? v : (v === '' ? null : +v); const op = bx.querySelector('details').open; bx.innerHTML = wBomSec(); if (op) bx.querySelector('details').open = true; }; }
-    if (W.ocrRun) { const w0 = W, t = setInterval(() => { if (W !== w0 || !$('wzbom')) return clearInterval(t); if (!w0.ocrRun) { clearInterval(t); $('wzbom').innerHTML = wBomSec(); accSave(w0); } }, 1000); }
+    if (W.ocrRun) { const w0 = W, t = setInterval(() => { if (W !== w0 || !$('wzbom')) return clearInterval(t); if (!w0.ocrRun) { clearInterval(t); $('wzbom').innerHTML = wBomSec(); rvShow(); accSave(w0); } }, 1000); }
   }
   function wClick(e) {
     const b = e.target.closest('[data-wz]'); if (!b || !W) return;
@@ -1392,6 +1394,125 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 @media(max-width:900px){.tbw{grid-template-columns:1fr}.tbimg{position:static}}`;
   document.head.appendChild(css);
 
+  /* ---------- 전문가 검토: 어떤 도면이든 같은 기준으로 3D 결과를 점검 ---------- */
+  const szN = t => { t = String(t); const m = t.match(/^(\d+)-(\d)\/(\d)$/); if (m) return +m[1] + m[2] / m[3]; const f = t.match(/^(\d)\/(\d)$/); return f ? f[1] / f[2] : +t; };
+  // 도면 위 크기 표기 (3/4", 1/2", 2", 3/4"X1/2") → 위치와 크기
+  function sizeLabels(w) {
+    if (w._szl) return w._szl;
+    const out = [], re = /(\d{1,2}-\d\/\d|\d\/\d|\d{1,2}(?="))"?(?:X(\d{1,2}-\d\/\d|\d\/\d|\d{1,2}(?=")))?/g;
+    const add = (t, p, c) => { const u = String(t).toUpperCase().replace(/[″”“]/g, '"').replace(/\s+/g, ''); if (/SHT|DWG|SEE|NO\.|REV|SCALE/.test(u)) return; let m; re.lastIndex = 0;
+      while ((m = re.exec(u))) { const a = szN(m[1]), b = m[2] ? szN(m[2]) : null; if (!QS.includes(a) || (b != null && !QS.includes(b))) continue; out.push({ a, b, p, t: m[0], c }); } };
+    (w.isoTxt || []).forEach(l => add(l.t, l.p, l.c));
+    (w.words || []).forEach(x => add(x.t, [x.cx, x.cy], x.c));
+    if (!w.ocrRun) w._szl = out;
+    return out;
+  }
+  // 도면 위 배관 구간들 (그림 좌표) — 크기 표기를 가장 가까운 구간에 붙임
+  function segsOf(w) {
+    const out = [];
+    w.R.runs.forEach((r, ri) => r.steps.forEach((s, si) => { const a = si ? r.steps[si - 1]._p : r._p0; if (a && s._p) out.push({ ri, si, a, b: s._p }); }));
+    return out;
+  }
+  const dSeg2 = (p, a, b) => { const v = [b[0] - a[0], b[1] - a[1]], L2 = v[0] * v[0] + v[1] * v[1] || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * v[0] + (p[1] - a[1]) * v[1]) / L2)); return Math.hypot(p[0] - a[0] - v[0] * t, p[1] - a[1] - v[1] * t); };
+  function labelsOnSegs(w) {
+    const sg = segsOf(w), out = [];
+    sizeLabels(w).forEach(L => { let best = null, bd = 26; sg.forEach(g => { const d = dSeg2(L.p, g.a, g.b); if (d < bd) { bd = d; best = g; } }); if (best) out.push(Object.assign({}, L, { ri: best.ri, si: best.si, d: bd })); });
+    return out;
+  }
+  // 가지 배관 크기: 그 가지 구간 옆의 크기 표기 (레듀서 표기는 제외)
+  function labelBranch(tid) {
+    const ri = W.R.runs.findIndex(r => r.start && r.start.tee === tid); if (ri < 0) return null;
+    const ls = labelsOnSegs(W).filter(l => l.ri === ri && l.b == null).sort((x, y) => x.si - y.si || x.d - y.d);
+    return ls.length ? ls[0].a : null;
+  }
+  const RVL = { err: '오류', warn: '확인', info: '참고' };
+  function review(w) {
+    if (!w || W !== w) return w && w.rv || [];
+    const F = [], R = w.R, add = (lv, cat, msg, loc) => F.push(Object.assign({ lv, cat, msg }, loc || {}));
+    const at = (ri, si, ph) => ({ ri, si, ph, at: (ri + 1) + '-' + (si + 1) });
+    // 1) 끝 처리
+    R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
+      if (s.t !== 'end') return;
+      const en = s.end || 'open', see = (w.see || []).some(o => s._p && Math.hypot(o.p[0] - s._p[0], o.p[1] - s._p[1]) < 90);
+      if (en === 'open' && s.flTick) add('warn', '끝 처리', '끝에 플랜지 표시가 있는데 "기존 배관 연결/용접"으로 두었습니다', at(ri, si, 'end'));
+      else if (en === 'open' && !see) add('warn', '끝 처리', '"기존 배관 연결/용접"으로 두었습니다 — 근처에 다른 장 표시(SEE DWG)가 없으니 캡·플랜지·장치 연결이 아닌지 확인', at(ri, si, 'end'));
+    }));
+    // 2) 치수 근거
+    R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
+      if (s.est) add('warn', '치수', '길이를 도면에서 못 읽어 그림 비율 어림값 ' + s.d + ' mm를 썼습니다', at(ri, si, 'len'));
+      else if (s.auto === 'ocr' && s.ocr && s.ocr.amb) add('info', '치수', '읽은 치수 ' + s.ocr.v + ' 근처에 다른 숫자가 있습니다', at(ri, si, 'len'));
+      if (s.okSlope && s.slopeFig) add('warn', '경사', '경사(롤링) 각도 치수가 없어 그림 비율로 정했습니다', at(ri, si, 'slope'));
+    }));
+    // 3) 도면 크기 표기와 3D 크기
+    if (!w.ocrRun) {
+      const seen = {};
+      labelsOnSegs(w).forEach(L => {
+        const k = L.ri + '.' + L.si; if (seen[k]) return; seen[k] = 1;
+        const s = R.runs[L.ri].steps[L.si], z = npsAt(L.ri, L.si);
+        if (L.b != null) { if (s.t === 'reducer' && (Math.abs(z - L.a) > 0.01 || Math.abs((+s.nps2 || 0) - L.b) > 0.01)) add('warn', '크기', '도면 표기 ' + L.t + '와 레듀서 ' + nf(z) + ' → ' + nf(+s.nps2) + '가 다릅니다', at(L.ri, L.si, 'rsize')); return; }
+        if (Math.abs(z - L.a) < 0.01) return;
+        const r = R.runs[L.ri], tee = r.start && r.start.tee, tl = tee && R.runs.map((x, i) => [i, x.steps.findIndex(y => y.id === tee)]).find(([, j]) => j >= 0);
+        add('warn', '크기', '도면에 ' + nf(L.a) + ' 표기가 있는데 3D는 ' + nf(z) + '입니다' + (tl && L.si < 2 ? ' — 가지 배관 크기 확인' : ' — 크기가 바뀌는 곳(레듀서·스웨지) 확인'), tl && L.si < 2 ? at(tl[0], tl[1], 'branch') : at(L.ri, L.si, null));
+      });
+    }
+    // 4) 크기 변화의 근거 (가지가 작아지면 레듀싱 티나 스웨지·레듀서가 BOM에 있어야)
+    if (w.bom) R.runs.forEach((r, ri) => {
+      if (!(r.start && r.start.tee) || !+r.nps) return;
+      const tl = R.runs.map((x, i) => [i, x.steps.findIndex(y => y.id === r.start.tee)]).find(([, j]) => j >= 0); if (!tl) return;
+      const main = npsAt(tl[0], tl[1]), br = +r.nps; if (br >= main - 0.01) return;
+      const has = w.bom.rows.some(x => (x.cat === 'TEE' && x.size2 && Math.abs(x.size2 - br) < 0.01) || (/REDUCER|SWAGE/.test(x.cat) && x.size2 && Math.abs(x.size2 - br) < 0.01) || (x.cat === 'OLET'));
+      if (!has) add('info', '크기', '가지가 ' + nf(main) + ' → ' + nf(br) + '로 작아지는데 도면 BOM에 레듀싱 티·스웨지·올렛이 보이지 않습니다', at(tl[0], tl[1], 'branch'));
+    });
+    // 5) 도면 BOM 대조
+    if (w.bom && w.built && w.built.length && !w.ocrRun) {
+      let list = []; try { list = bomCompare(w.bom, P.bom(w.built)); } catch (e) { }
+      const openAt = z => { const o = []; R.runs.forEach((r, ri) => r.steps.forEach((s, si) => { if (s.t === 'end' && (s.end || 'open') === 'open' && Math.abs(npsAt(ri, si) - z) < 0.01) o.push((ri + 1) + '-' + (si + 1)); })); return o; };
+      list.forEach(x => {
+        const nm = (CATK[x.c] || x.c) + (x.z ? ' ' + nf(x.z) : '') + (x.z2 ? '×' + nf(x.z2) : '');
+        if (x.c === 'GASKET' || x.c === 'STUD/BOLT') return;
+        if (x.st === 'q') { add('info', 'BOM', nm + ' — 도면 BOM 수량을 못 읽었습니다 (아래 BOM 표에서 고치기)'); return; }
+        if (x.c === 'PIPE') {
+          if (x.d && x.m > x.d * 1.15 + 0.3) add('warn', '배관 길이', nm + ' 3D 총길이 ' + x.m + ' m가 도면 BOM ' + x.d + ' m보다 깁니다 — 어림값 치수부터 확인');
+          else if (x.d && x.m < x.d * 0.6 - 0.3) add('warn', '배관 길이', nm + ' 3D 총길이 ' + x.m + ' m가 도면 BOM ' + x.d + ' m보다 많이 짧습니다 — 빠진 구간 확인');
+          return;
+        }
+        if (x.st !== 'diff' && x.st !== 'extra' && x.st !== 'miss') return;
+        const n = x.d - x.m;
+        if (!x.m && x.d) { add('err', 'BOM', nm + ' ' + x.d + '개가 3D에 없습니다' + (/STRAINER|SWAGE|NIPPLE|COUPLING|UNION|OLET/.test(x.c) ? ' — 자동으로 못 그리는 부품입니다. 위치를 정해 고급 편집에서 넣으세요' : ' — 도면에서 위치를 확인하세요')); return; }
+        if (x.c === 'FLANGE' && n > 0) { const o = openAt(x.z), nn = (W.dropped || []).filter(d => Math.abs(d.z - x.z) < 0.01).map(d => d.at); add('err', 'BOM', nm + ' ' + n + '개 부족 (도면 ' + x.d + ' / 3D ' + x.m + ')' + (o.length ? ' — 열린 끝 ' + o.join(', ') : '') + (nn.length ? ' · "아무것도 아님"으로 답한 곳 ' + nn.join(', ') : '') + (o.length || nn.length ? ' 확인' : ' — 배관 끝·장 경계·밸브 양쪽 플랜지 확인')); return; }
+        if (x.c === 'FLANGE' && n < 0) { add('err', 'BOM', nm + ' ' + (-n) + '개 많음 (도면 ' + x.d + ' / 3D ' + x.m + ') — 플랜지로 본 표시 중 용접점·밸브·크기 다른 곳이 있는지 확인'); return; }
+        add('err', 'BOM', nm + ' 도면 ' + x.d + ' / 3D ' + x.m + (x.st === 'extra' ? ' — 도면 BOM에 없는 부품' : ''));
+      });
+      // 도면 BOM 자체 점검: 볼트 수 = 가스켓 수 × 플랜지 볼트 수
+      const grp = {};
+      w.bom.rows.forEach(x => { if (!x.size || !/GASKET|STUD/.test(x.cat)) return; const cls = +((String(x.desc || '') + ' ' + (x.code || '')).match(/\b(150|300|600|900|1500|2500)\b/) || [, 150])[1]; const k = x.size + '|' + cls; const g = grp[k] = grp[k] || { z: x.size, cls, g: 0, b: 0 }; if (x.cat === 'GASKET') g.g += +x.qty || 0; else g.b += +x.qty || 0; });
+      Object.values(grp).forEach(g => { if (!g.g || !g.b || !P.nBolt) return; const nb = P.nBolt(g.z, g.cls); if (nb && g.b !== g.g * nb) add('info', 'BOM 표', nf(g.z) + ' ' + g.cls + '# 볼트 ' + g.b + '개가 가스켓 ' + g.g + '개 × ' + nb + ' = ' + g.g * nb + '와 다릅니다 — 도면 BOM 글자를 잘못 읽었을 수 있습니다'); });
+      // 엘보 각도
+      w._inRv = true; let a; try { a = accOf(w); } finally { w._inRv = false; } const e = a.bom && a.bom.elb;
+      if (e && (e.m[90] !== e.d[90] || e.m[45] !== e.d[45] || e.m.x)) add('err', '엘보', '엘보 수·각도가 도면 BOM과 다릅니다 — 3D 90° ' + e.m[90] + '·45° ' + e.m[45] + (e.m.x ? '·기타 ' + e.m.x : '') + ' / BOM 90° ' + e.d[90] + '·45° ' + e.d[45]);
+    } else if (!w.bom && !w.ocrRun) add('info', 'BOM', '도면 BOM 표를 찾지 못해 자재 수량을 대조하지 못했습니다');
+    if (w.built && !w.clsCode && !w.ocrRun) add('info', '자재 사양', '라인 번호에 맞는 라인 클래스가 없어 재질·등급이 기본값입니다 (📋 라인 클래스에서 등록)');
+    const ord = { err: 0, warn: 1, info: 2 };
+    F.sort((p, q) => ord[p.lv] - ord[q.lv]);
+    w.rv = F;
+    return F;
+  }
+  function rvHtml(F, pfx) {
+    if (!F.length) return '<div class="rv ok"><b>✓ 검토 통과</b> — 끝 처리·치수 근거·크기 표기·도면 BOM 대조에서 걸린 곳이 없습니다.</div>';
+    const n = k => F.filter(f => f.lv === k).length;
+    return `<div class="rv"><div class="rv-hd"><b>전문가 검토</b><span class="bdg bad">오류 ${n('err')}</span><span class="bdg warn">확인 ${n('warn')}</span><span class="bdg">참고 ${n('info')}</span></div><ul>${F.map((f, i) => `<li class="rv-${f.lv}"><span class="rv-c">${E(f.cat)}</span>${f.at ? (f.ph ? `<button class="lnk" data-rv="${pfx || ''}${i}">${E(f.at)}</button> ` : `<b>${E(f.at)}</b> `) : ''}${E(f.msg)}</li>`).join('')}</ul></div>`;
+  }
+  function rvJump(f) {
+    if (!f || !W) return;
+    const r = W.R.runs[f.ri], s = r && r.steps[f.si]; if (!s) return;
+    if (f.ph) {
+      if (f.ph === 'len') s.okLen = false; else if (f.ph === 'end') s.okEnd = false; else if (f.ph === 'branch') s.okBranch = false; else if (f.ph === 'rsize') s.okRed = false; else if (f.ph === 'slope') s.okSlope = false;
+      W.q = { ri: f.ri, si: f.si, phase: f.ph };
+    } else W.q = { ri: f.ri, si: f.si, phase: phasesOf(s)[0] || 'len' };
+    W.fixAt = W.hist.length; wRender();
+  }
+  function rvShow() { const el = $('wzrv'); if (!el || !W) return; el.innerHTML = rvHtml(review(W)); }
+  document.getElementById('isob').addEventListener('click', e => { const b = e.target.closest('[data-rv]'); if (!b || !W) return; const v = b.dataset.rv; if (/^b/.test(v)) return; rvJump((W.rv || [])[+v]); });
   /* ---------- 여러 장 일괄 변환 · 정확도 점검 ---------- */
   let B = null;
   const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
@@ -1417,6 +1538,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
         a.bom = { rows: w.bom.rows.length, ok: g.ok, diff: g.diff, extra: g.extra, q: g.q, pipe: p, elb: { m: ec, d: be }, bad: bad.slice(0, 12), okc };
       } catch (e) { a.bom = null; }
     }
+    try { if (W === w && !w._inRv) { const F = review(w); a.rv = { err: F.filter(f => f.lv === 'err').length, warn: F.filter(f => f.lv === 'warn').length }; } } catch (e) { }
     return a;
   }
   const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
@@ -1446,7 +1568,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
       else if (q.phase === 'type') { if (!a) { a = 'type:flange'; why = '표시 종류를 모름 — 플랜지로 봄'; } }
       else if (q.phase === 'end') { if (!a) { a = 'end:open'; why = '배관 끝 처리를 모름 — 기존 배관 연결로 봄'; } }
       else if (q.phase === 'rsize') why = '레듀서 크기 추정 — ' + (a ? a.split(':')[1] + '"' : '');
-      else if (q.phase === 'branch') why = a && a !== 'br:' + npsAt(q.ri, q.si) ? '가지 배관 크기 — 도면 BOM 보고 ' + a.split(':')[1] + '"로 봄' : '가지 배관 크기 — 본관과 같다고 봄';
+      else if (q.phase === 'branch') { const lz = labelBranch(s.id); why = lz != null && a === 'br:' + lz ? null : a && a !== 'br:' + npsAt(q.ri, q.si) ? '가지 배관 크기 — 도면 BOM 보고 ' + a.split(':')[1] + '"로 봄' : '가지 배관 크기 — 본관과 같다고 봄'; }
       if (!a) { flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why: '자동으로 답하지 못함' }); break; }
       if (why) flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why });
       const sig = JSON.stringify(W.q) + '|' + W.hist.length;
@@ -1461,9 +1583,10 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
     w0.auto = false;
     const sh = w0.f.sheet || {}, nObj = (w0.built || []).length;
     const acc = accOf(w0); w0.f.acc = acc; await P.fPut(w0.f);
-    if (acc.bom && acc.bom.elb) { const e = acc.bom.elb; if (e.m[90] !== e.d[90] || e.m[45] !== e.d[45] || e.m.x) flags.push({ ri: 0, si: 0, ph: 'done', at: '엘보', why: '엘보 수가 도면 BOM과 다름 — 3D 90° ' + e.m[90] + '·45° ' + e.m[45] + ' / BOM 90° ' + e.d[90] + '·45° ' + e.d[45] }); }
     const okc = acc.bom && acc.bom.okc; // 도면 BOM 수량이 맞는 품목은 추정 답도 맞는 것으로 봄
     if (okc) { const drop = { type: okc.valve, branch: okc.tee, rsize: okc.red, end: okc.end }; for (let k = flags.length - 1; k >= 0; k--) if (drop[flags[k].ph]) flags.splice(k, 1); }
+    // 전문가 검토 결과 합치기 (같은 곳·같은 질문은 한 번만)
+    review(w0).filter(f => f.lv !== 'info').forEach(f => { if (f.ph && flags.some(g => g.ri === f.ri && g.si === f.si && g.ph === f.ph)) return; if (f.cat === '치수' && flags.some(g => g.ri === f.ri && g.si === f.si && g.ph === 'len')) return; flags.push({ ri: f.ri, si: f.si, ph: f.ph || 'done', at: f.at || f.cat, why: f.msg, lv: f.lv }); });
     w0.big = null; // 메모리 아끼기 (다시 열 때 그림)
     return { st: 'ok', W: w0, flags, n: nObj, ln: sh.ln || w0.R.line_no || '', sht: sh.sht, of: sh.of, placed: w0.placed, cls: w0.clsCode, acc };
   }
@@ -1513,7 +1636,7 @@ ${B.run ? '<p class="mut">도면마다 치수·BOM 글자를 읽느라 한 장�
     W = it.W; W.batchI = i; W.fixJ = j;
     if (!W.big) { W.big = document.createElement('canvas'); await P.drawFile(W.f, W.big, 3200); }
     const f = j == null ? null : it.flags[j];
-    if (f && f.ph && !['done', 'size'].includes(f.ph) && W.R.runs[f.ri] && W.R.runs[f.ri].steps[f.si]) { W.q = { ri: f.ri, si: f.si, phase: f.ph }; W.fixAt = W.hist.length; }
+    if (f && f.ph && !['done', 'size'].includes(f.ph) && W.R.runs[f.ri] && W.R.runs[f.ri].steps[f.si]) { rvJump(f); return; }
     else if (f && f.ph === 'size') { W.q = { ri: 0, si: 0, phase: 'size' }; W.fixAt = W.hist.length; }
     else { W.q = { ri: 0, si: 0, phase: 'done' }; W.fixAt = null; }
     wRender();
@@ -1526,10 +1649,10 @@ ${B.run ? '<p class="mut">도면마다 치수·BOM 글자를 읽느라 한 장�
     const P1 = (a, b) => { const v = pct(a, b); return v == null ? '—' : v + '%'; };
     const cmp = T.ok + T.diff + T.extra;
     const rows = fs.map(f => { const a = f.acc, b = a.bom, l = a.len, c = b ? b.ok + b.diff + b.extra : 0;
-      return `<tr><td><div class="bt-n">${E(f.name)}</div><div class="mut">${E(a.ln || '')}</div></td><td class="num">${b ? P1(b.ok, c) : '<span class="mut">BOM 없음</span>'}</td><td class="num">${b ? (b.pipe.n ? b.pipe.ok + '/' + b.pipe.n : '—') : ''}</td><td class="num">${b ? (b.elb.m[90] === b.elb.d[90] && b.elb.m[45] === b.elb.d[45] && !b.elb.m.x ? '✓' : `<span class="bad">${b.elb.m[90]}·${b.elb.m[45]} / ${b.elb.d[90]}·${b.elb.d[45]}</span>`) : ''}</td><td class="num">${P1(l.ocr, l.n)}</td><td class="num">${P1(l.fit, l.n)}</td><td class="num">${l.est ? '<span class="bad">' + l.est + '</span>' : '0'}</td></tr>${b && b.bad.length ? `<tr class="bt-fl"><td colspan="7"><ul>${b.bad.map(t => '<li>' + E(t) + '</li>').join('')}</ul></td></tr>` : ''}`; }).join('');
+      return `<tr><td><div class="bt-n">${E(f.name)}</div><div class="mut">${E(a.ln || '')}</div></td><td class="num">${b ? P1(b.ok, c) : '<span class="mut">BOM 없음</span>'}</td><td class="num">${b ? (b.pipe.n ? b.pipe.ok + '/' + b.pipe.n : '—') : ''}</td><td class="num">${b ? (b.elb.m[90] === b.elb.d[90] && b.elb.m[45] === b.elb.d[45] && !b.elb.m.x ? '✓' : `<span class="bad">${b.elb.m[90]}·${b.elb.m[45]} / ${b.elb.d[90]}·${b.elb.d[45]}</span>`) : ''}</td><td class="num">${P1(l.ocr, l.n)}</td><td class="num">${P1(l.fit, l.n)}</td><td class="num">${l.est ? '<span class="bad">' + l.est + '</span>' : '0'}</td><td class="num">${a.rv ? (a.rv.err ? '<span class="bad">' + a.rv.err + '</span>' : '0') + ' · ' + a.rv.warn : '—'}</td></tr>${b && b.bad.length ? `<tr class="bt-fl"><td colspan="8"><ul>${b.bad.map(t => '<li>' + E(t) + '</li>').join('')}</ul></td></tr>` : ''}`; }).join('');
     P.ov('정확도 점검', `<div class="bt"><p class="bt-lead">3D로 만든 도면마다 <b>도면 BOM</b>(도면에서 읽은 자재표)과 3D 자재를 맞춰 본 결과입니다. 도면 BOM 글자를 잘못 읽은 경우도 차이로 나오니, 차이 항목은 도면과 함께 확인하세요.</p>
 ${fs.length ? `<div class="bt-sum"><div><b>${fs.length}</b><span>도면</span></div><div><b>${P1(T.ok, cmp)}</b><span>부품 수 일치 (${T.ok}/${cmp} 품목 · 가스켓·볼트 제외)</span></div><div><b>${P1(T.pk, T.pn)}</b><span>배관 길이 일치</span></div><div><b>${T.en ? T.e + '/' + T.en : '—'}</b><span>엘보 수·각도 일치</span></div><div><b>${P1(T.l.ocr + T.l.fit, T.l.n)}</b><span>치수 근거 있음 (도면 ${P1(T.l.ocr, T.l.n)} · ASME ${P1(T.l.fit, T.l.n)})</span></div><div class="${T.l.est ? 'w' : ''}"><b>${T.l.est}</b><span>어림값 구간</span></div></div>
-<table class="btt"><thead><tr><th>도면</th><th class="num">부품 일치</th><th class="num">배관 길이</th><th class="num">엘보 (3D / BOM)</th><th class="num">치수: 도면</th><th class="num">ASME</th><th class="num">어림값</th></tr></thead><tbody>${rows}</tbody></table>
+<table class="btt"><thead><tr><th>도면</th><th class="num">부품 일치</th><th class="num">배관 길이</th><th class="num">엘보 (3D / BOM)</th><th class="num">치수: 도면</th><th class="num">ASME</th><th class="num">어림값</th><th class="num">검토 오류·확인</th></tr></thead><tbody>${rows}</tbody></table>
 <p class="mut">부품 일치 = 품목·크기별 수량이 도면 BOM과 같은 비율 (배관은 길이로 따로, 가스켓·볼트는 플랜지를 따라가므로 제외). 배관 길이는 BOM이 구매 길이(올림)라 3D가 조금 짧아도 같음으로 봅니다. 엘보는 90°·45° 개수.</p>
 <div class="row bt-ft"><button data-att="back">← 첨부 목록</button>${B && !B.run ? '<button data-bt="res">← 일괄 변환 결과</button>' : ''}<span style="flex:1"></span><button data-bt="csv">CSV로 저장</button></div>` : '<p class="mut">아직 점검할 도면이 없습니다. 도면을 3D로 만들면 여기에 쌓입니다.</p><div class="row bt-ft"><button data-att="back">← 첨부 목록</button></div>'}</div>`, true);
     accReport.fs = fs;
@@ -1557,6 +1680,7 @@ ${fs.length ? `<div class="bt-sum"><div><b>${fs.length}</b><span>도면</span></
 .bt{max-width:1150px;margin:0 auto}.bt-lead{color:#334155;line-height:1.55;margin:0 0 14px}
 #iso .btt{width:100%;max-width:none;border-collapse:collapse;font-size:14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-top:0;border-collapse:separate;border-spacing:0}#iso .btt th{border:0;background:#f8fafc;color:#475569;font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;white-space:nowrap}#iso .btt td{padding:9px 10px;border:0;border-top:1px solid #f1f5f9;vertical-align:top}#iso .btt th.num,#iso .btt td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}#iso .btt td.nw{white-space:nowrap;text-align:right}#iso .btt tr.on td{background:#f0fdfa}
 .bt-n{font-weight:600;color:#0f172a;word-break:break-all}.bt-err{color:#b91c1c;font-size:13px;margin-top:2px}#iso .btt .bad{color:#b91c1c}
+#iso .rv{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin:12px 0}.rv.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534}.rv-hd{display:flex;gap:8px;align-items:center;margin-bottom:6px}.rv-hd b{font-size:15px;margin-right:4px}.rv ul{margin:0;padding:0;list-style:none}.rv li{padding:6px 0 6px 10px;border-top:1px solid #f1f5f9;font-size:14px;line-height:1.5;border-left:3px solid #cbd5e1;margin:2px 0}.rv li.rv-err{border-left-color:#dc2626}.rv li.rv-warn{border-left-color:#d97706}.rv-c{display:inline-block;min-width:64px;font-size:12px;color:#64748b;margin-right:6px}.rv .lnk{background:none;border:0;padding:0;color:#0f766e;font-weight:600;text-decoration:underline;cursor:pointer;min-width:0}
 #iso .bt-fl td{border-top:0!important;padding-top:0!important;background:#fffbeb}#iso .bt-fl ul{margin:0;padding:4px 0 8px 16px;font-size:13px;color:#78350f;line-height:1.7}#iso .bt-fl .lnk{background:none;border:0;padding:0;color:#0f766e;font-weight:600;text-decoration:underline;cursor:pointer;font-size:13px;min-width:0}
 .bdg{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#475569;white-space:nowrap}.bdg.ok{background:#dcfce7;color:#166534}.bdg.warn{background:#fef3c7;color:#92400e}.bdg.bad{background:#fee2e2;color:#991b1b}.bdg.run{background:#ccfbf1;color:#115e59}
 .bt-hd{display:flex;align-items:center;gap:12px;margin:0 0 12px}.bt-hd .wzbar{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}.bt-hd .wzbar i{display:block;height:100%;background:#0f766e;transition:width .4s}
