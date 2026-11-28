@@ -409,7 +409,7 @@ const EQT=['drum','vessel','reactor','hx','pump','rack','platform','ladder','bea
 function rotObjs(l,M,pv){const isY=M[1][1]===1&&M[0][1]===0&&M[2][1]===0;let skip=0;
  l.forEach(o=>{if(EQT.includes(o.type)&&!isY){skip++;return}
   const d=[o.pos[0]-pv[0],o.pos[1]-pv[1],o.pos[2]-pv[2]],n=mv3(M,d);o.pos=[pv[0]+n[0],pv[1]+n[1],pv[2]+n[2]].map(v=>Math.round(v*10)/10);
-  for(const k of Object.keys(o)){const v=o[k];if(typeof v==='string'&&B6[v]&&k!=='face'){const w=mv3(M,[B6[v].x,B6[v].y,B6[v].z]);o[k]=keyOf(V(w[0],w[1],w[2]))}}
+  for(const k of Object.keys(o)){const v=o[k];if(typeof v==='string'&&k!=='face'&&k!=='tag'&&(v.length<=4||v.startsWith('v:'))&&DIR[v]){const w=mv3(M,[DIR[v].x,DIR[v].y,DIR[v].z]);o[k]=keyOf(V(w[0],w[1],w[2]))}}
   if(EQT.includes(o.type)){const t0=(o.rot||0)*Math.PI/180,ex=mv3(M,[Math.cos(t0),0,-Math.sin(t0)]);o.rot=((Math.round(Math.atan2(-ex[2],ex[0])*180/Math.PI))%360+360)%360}
   rb(o)});return skip}
 function rotSel(axis,sign){const l=selIds().map(get).filter(Boolean);if(!l.length)return;const b=[[1e9,1e9,1e9],[-1e9,-1e9,-1e9]];l.forEach(o=>ports(o).concat([{p:o.pos}]).forEach(q=>[0,1,2].forEach(i=>{b[0][i]=Math.min(b[0][i],q.p[i]);b[1][i]=Math.max(b[1][i],q.p[i])})));
@@ -786,7 +786,25 @@ function pal(){let cl={};try{cl=JSON.parse(localStorage.getItem('p3d_palc')||'{}
  $('pal').querySelectorAll('.pg h4').forEach(h=>h.onclick=()=>{const g=h.parentNode;g.classList.toggle('cl');const c={};document.querySelectorAll('#pal .pg.cl').forEach(x=>c[x.dataset.g]=1);try{localStorage.setItem('p3d_palc',JSON.stringify(c))}catch(e){}});
  $('leg').innerHTML=Object.keys(ST).map(k=>'<span><i style="background:#'+ST[k].toString(16).padStart(6,'0')+'"></i>'+k+'</span>').join('')}
 const opt=(a,v)=>a.map(([k,l])=>'<option value="'+k+'"'+(String(k)===String(v)?' selected':'')+'>'+l+'</option>').join('');
-function rp(){rp0();xyzSec()}
+function rp(){rp0();rollSec();xyzSec()}
+/* 🔄 롤링: 엘보(또는 티 가지)를 들어오는 배관 축으로 원하는 각도만큼 돌림 — 뒤에 이어진 배관도 함께 */
+let rollCarry=true,rollStep=15;
+function rotM(a,th){const c=Math.cos(th),s2=Math.sin(th),t=1-c,x=a.x,y=a.y,z=a.z;return[[t*x*x+c,t*x*y-s2*z,t*x*z+s2*y],[t*x*y+s2*z,t*y*y+c,t*y*z-s2*x],[t*x*z-s2*y,t*y*z+s2*x,t*z*z+c]]}
+function downOf(o,bp){const near=(x,P1)=>ports(x).some(q=>Math.hypot(q.p[0]-P1[0],q.p[1]-P1[1],q.p[2]-P1[2])<3),block=new Set(objs.filter(x=>x!==o&&bp.some(P1=>near(x,P1)))),seen=new Set([o]),st=[o];
+ while(st.length){const c=st.pop();conO(c).forEach(x=>{if(seen.has(x)||block.has(x))return;seen.add(x);st.push(x)})}seen.delete(o);return[...seen]}
+function rollPart(id,deg){const o=get(id);if(!o||!(o.type==='elbow'||o.type==='tee'))return;const a=DIR[o.axis];if(!a)return;
+ const ps=ports(o),bp=o.type==='elbow'?[o.pos]:ps.filter(q=>q.n!=='분기').map(q=>q.p); /* 엘보: 들어오는 쪽, 티: 본관 양쪽은 그대로 */
+ const l=[o].concat(rollCarry?downOf(o,bp):[]),M=rotM(a,deg*Math.PI/180);
+ rotObjs(l,M,o.pos);
+ o.roll=Math.round((((+o.roll||0)+deg)%360+540)%360-180);hl();rp();lg(o.tag+' 롤링 '+(deg>0?'+':'')+deg+'°'+(l.length>1?' (이어진 '+(l.length-1)+'개 함께)':''));$('hint').textContent=o.tag+' 롤링 '+(deg>0?'+':'')+deg+'° — 지금 '+(o.roll||0)+'°'+(l.length>1?' · 이어진 '+(l.length-1)+'개도 함께 돌렸습니다':'')+'. 되돌리기 Ctrl+Z'}
+function rollSec(){if(ml.length>1)return;const o=get(sid);if(!o||!(o.type==='elbow'||o.type==='tee'))return;const el=$('props');
+ el.insertAdjacentHTML('beforeend',`<div class="xyz rollsec"><b style="color:var(--ac);font-size:13px">🔄 롤링 — ${o.type==='elbow'?'들어오는 배관 축으로 엘보 돌리기':'가지 방향을 본관 축으로 돌리기'}</b>
+<div class="row" style="margin:6px 0;gap:4px;flex-wrap:wrap">${[-45,-15,-5,5,15,45].map(d=>`<button data-roll="${d}">${d>0?'+':''}${d}°</button>`).join('')}</div>
+<div class="row" style="gap:6px;align-items:center"><input id="rolld" type="number" step="any" value="${rollStep}" style="width:80px"><span>°</span><button id="rollgo" class="pri">돌리기</button><label style="font-size:12px"><input id="rollc" type="checkbox"${rollCarry?' checked':''}> 뒤에 이어진 배관도 함께</label></div>
+<div class="xp">지금 ${+o.roll||0}° (처음 놓은 방향 기준). 출구 방향: ${EH(dirTxt(o.type==='elbow'?o.turn:o.branch))}. 90° 엘보를 비스듬히 돌려 롤링 배관을 만들 때 씁니다.</div></div>`);
+ el.querySelectorAll('[data-roll]').forEach(b=>b.onclick=()=>rollPart(o.id,+b.dataset.roll));
+ $('rollgo').onclick=()=>{const d=+$('rolld').value;if(d&&isFinite(d)){rollStep=d;rollPart(o.id,d)}};$('rollc').onchange=()=>{rollCarry=$('rollc').checked}}
+function dirTxt(k){const v=DIR[k];if(!v)return'-';const N={x:['동','서'],y:['위','아래'],z:['남','북']},parts=[];['x','z','y'].forEach(c=>{const q=v[c];if(Math.abs(q)>.02)parts.push(N[c][q>0?0:1]+(Math.abs(q)<.999?' '+Math.round(Math.abs(q)*100)+'%':''))});return parts.join(' · ')}
 /* 📍 좌표 보기·실제 좌표에 놓기 (E=동쪽 +X, N=북쪽 -Z, EL=높이 +Y, mm) */
 let xyzOpen=false;
 const toENE=p=>[Math.round(p[0]),Math.round(-p[2]),Math.round(p[1])];
