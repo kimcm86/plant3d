@@ -767,7 +767,7 @@ RULES
       if (s._wd.some(t => t > 0.12 && t < 0.88)) return; // 사이에 용접점이 있으면 배관이 있음 → 물어봄
       if (['flange', 'valve'].includes(s.t) && !s.okType) return;
       const n = npsAt(ri, si);
-      const a = si === 0 ? (r.start && r.start.tee ? 'tee' : (s._wd.some(t => t <= 0.12) ? 'weld' : null)) : r.steps[si - 1].t;
+      const a = si === 0 ? (r.start && r.start.tee ? 'tee' : r.startFl ? 'flange' : (s._wd.some(t => t <= 0.12) ? 'weld' : null)) : r.steps[si - 1].t;
       const b = s.t === 'end' ? (s._wd.some(t => t >= 0.88) ? 'weld' : null) : s.t;
       if (![a, b].some(k => k === 'elbow' || k === 'tee' || k === 'tee_in')) return;
       const pa = si > 0 ? r.steps[si - 1] : null, ha = fitHalf(a, n, pa && pa.eang), hb = fitHalf(b, n, s.eang); if (ha == null || hb == null) return;
@@ -1319,7 +1319,7 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     return res;
   }
   async function wBuild() {
-    const b = buildRoute(W.R, W.src);
+    const b = buildRoute(W.R, W.src); W.bErrs = b.errs || [];
     const tt = W.title || {}, me = { ln: W.R.line_no || tt.line_no || '', sht: tt.sht || null, of: tt.of || null };
     const ends = openEnds(W.R);
     // 도면에서 읽은 'SEE 2/3' 표시를 가까운 끝에 붙임
@@ -1437,6 +1437,8 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
       if (en === 'open' && s.flTick) add('warn', '끝 처리', '끝에 플랜지 표시가 있는데 "기존 배관 연결/용접"으로 두었습니다', at(ri, si, 'end'));
       else if (en === 'open' && !see) add('warn', '끝 처리', '"기존 배관 연결/용접"으로 두었습니다 — 근처에 다른 장 표시(SEE DWG)가 없으니 캡·플랜지·장치 연결이 아닌지 확인', at(ri, si, 'end'));
     }));
+    // 0) 3D로 만들 때 맞지 않은 곳 (겹침·시작점 못 찾음 등)
+    (w.bErrs || []).forEach(e => add('err', '조립', e.msg, e.ri != null && e.si >= 0 ? at(e.ri, e.si, 'len') : e.ri != null ? { at: (e.ri + 1) + '번 배관' } : null));
     // 2) 치수 근거
     R.runs.forEach((r, ri) => r.steps.forEach((s, si) => {
       if (s.est) add('warn', '치수', '길이를 도면에서 못 읽어 그림 비율 어림값 ' + s.d + ' mm를 썼습니다', at(ri, si, 'len'));
