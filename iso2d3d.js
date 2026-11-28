@@ -687,7 +687,7 @@ RULES
   /* ================= 질문식 3D 변환 (한 번에 하나씩) ================= */
   let W = null;
   const QS = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24];
-  const phasesOf = s => (s.roll && !s.okRoll ? ['roll'] : []).concat(['flange', 'valve'].includes(s.t) && !s.okType ? ['type'] : []).concat(s.t === 'valve' && s.okType && !s.okVsize ? ['vsize'] : []).concat(s.t === 'reducer' && !s.okRed ? ['rsize'] : []).concat(s.t === 'tee' && !s.okBranch ? ['branch'] : []).concat(s.okLen ? [] : ['len']).concat(s.t === 'end' && !s.okEnd ? ['end'] : []);
+  const phasesOf = s => (s.roll && !s.okRoll ? ['roll'] : []).concat(s.roll && s.okRoll && s.roll.pl !== 'AX' && !s.okSlope ? ['slope'] : []).concat(['flange', 'valve'].includes(s.t) && !s.okType ? ['type'] : []).concat(s.t === 'valve' && s.okType && !s.okVsize ? ['vsize'] : []).concat(s.t === 'reducer' && !s.okRed ? ['rsize'] : []).concat(s.t === 'tee' && !s.okBranch ? ['branch'] : []).concat(s.okLen ? [] : ['len']).concat(s.t === 'end' && !s.okEnd ? ['end'] : []);
   // 이 지점에서의 배관 크기 (런 크기 → 앞쪽 레듀서 반영)
   function npsAt(ri, si) {
     const R = W.R, r = R.runs[ri]; let n = +r.nps || +R.nps || 4;
@@ -698,7 +698,11 @@ RULES
   // 엘보·티가 플랜지나 용접점에 바로 붙은 짧은 구간(사이에 배관 용접점 없음)은
   // 배관이 없는 '부품 맞붙임' 구간 → ASME B16.9(엘보·티 중심~끝) + B16.5(플랜지) 치수로 길이를 자동으로 넣는다
   // 이 구간이 경사(롤링) 구간인가 → 그 경사 정보
-  function rollOf(ri, si) { const r = W.R.runs[ri], s = r.steps[si]; if (!s || !s.rollSeg) return null; const pv = si > 0 ? r.steps[si - 1] : r; return pv.roll && pv.roll.pl !== 'AX' ? pv.roll : null; }
+  // 이 구간이 속한 경사의 시작 엘보(roll 정보가 있는 지점) 찾기
+  function rollStart(ri, si) { const r = W.R.runs[ri]; if (!r.steps[si] || !r.steps[si].rollSeg) return null; for (let i = si - 1; i >= 0; i--) { const x = r.steps[i]; if (x.roll) return { el: x, i }; if (!x.rollSeg) return null; } return r.roll ? { el: r, i: -1 } : null; }
+  function rollOf(ri, si) { const z = rollStart(ri, si); return z && z.el.roll.pl !== 'AX' ? z.el.roll : null; }
+  // 경사 구간의 지점들 (시작 엘보 다음부터 경사가 끝나는 곳까지)
+  function rollSteps(ri, ei) { const r = W.R.runs[ri], out = []; for (let j = ei + 1; j < r.steps.length; j++) { if (!r.steps[j].rollSeg) break; out.push(j); } return out; }
   // 롤링: 면(pl)과 두 변 길이로 3D 방향 벡터
   const AXE = { X: '+X', Y: '+Y', Z: '+Z' }, AXW = { X: '동서', Y: '위아래', Z: '남북' };
   function rollVec(rl, pl, legs) { const g = rl.pq && rl.pq[pl]; if (!g) return null; const la = legs ? legs[0] : Math.abs(g.a), lb = legs ? legs[1] : Math.abs(g.b);
@@ -709,11 +713,12 @@ RULES
   // 도면 BOM의 엘보 각도별 개수
   function bomElb() { if (!W.bom) return null; const c = { 90: 0, 45: 0 }; W.bom.rows.forEach(x => { if (x.cat !== 'ELBOW') return; const a = /45/.test((x.code || '') + ' ' + (x.desc || '')) ? 45 : 90; c[a] += +x.qty || 0; }); return c; }
   // 롤 구간 방향이 정해지면 앞뒤 엘보 각도 갱신
-  function rollApply(ri, si, vec) {
-    const r = W.R.runs[ri], el = si > 0 ? r.steps[si - 1] : null, seg = r.steps[si];
-    const key = P.keyOf(vec);
-    if (el && el.t === 'elbow') { el.to = key; const din = dirBefore(ri, si - 1); if (din) el.eang = angOf(din, vec); } else if (!el) r.dir = key;
-    if (seg && seg.t === 'elbow' && seg.to) seg.eang = angOf(seg.to, vec);
+  // 경사 방향이 정해지면: 시작 엘보의 방향·각도, 경사가 끝나는 엘보의 각도 갱신 (ei = 시작 엘보 번호, -1이면 배관 시작)
+  function rollApply(ri, ei, vec) {
+    const r = W.R.runs[ri], key = P.keyOf(vec);
+    if (ei >= 0) { const el = r.steps[ei]; el.to = key; const din = dirBefore(ri, ei); if (din) el.eang = angOf(din, vec); } else r.dir = key;
+    const js = rollSteps(ri, ei), last = js.length ? r.steps[js[js.length - 1]] : null;
+    if (last && last.t === 'elbow' && last.to) last.eang = angOf(last.to, vec);
   }
   function fitHalf(kind, n, eang) {
     const R = W.R, cls = +R.cls || 150;
@@ -744,7 +749,7 @@ RULES
   function ocrApply() {
     W.R.runs.forEach(r => r.steps.forEach(s => {
       if (s.okLen || !s.ocr || s.ocr.c < 90 || s.ocr.amb) return;
-      if (s.rollSeg) return; // 경사 구간은 두 변을 직접 확인
+      if (s.ocr.off) return; // 빗금 삼각형 변 치수는 기울기 질문에서 확인
       s.d = s.ocr.v;
       s.okLen = true; s.auto = 'ocr'; delete s.est; delete s.conf;
     }));
@@ -902,6 +907,14 @@ RULES
         title = branchNote + '파란 띠 구간이 비스듬한 배관(경사·롤링)입니다. 어느 면에서 기울었나요? <span class="wzt wzto">' + why + bnote + '</span>';
         body = `<div class="wzb">${Object.keys(rl.alts).map(k => btn('roll:' + k, PLK[k] + ' <span class="mut">(' + E(dirName(rl.alts[k])) + (ea[k] != null ? ' · ' + elbName(ea[k]) : '') + ')</span>', pick === k ? 'on' : (k === 'AX' ? 'ghost' : ''))).join('')}</div>
 <p class="mut">빗금 삼각형: 바닥에 눕힌 삼각형 = 수평 경사, 세운 삼각형 = 수직 경사. 들어오는 배관과 직각인 면이면 <b>90° 엘보를 돌려서(롤링)</b> 붙이고, 같은 면이면 45° 등 각도 엘보입니다. 다음 질문에서 삼각형 두 변 길이를 넣으면 정확한 각도로 만듭니다.${be ? `<br>도면 BOM 엘보: 90° ${be[90]}개 · 45° ${be[45]}개` : ''}</p>`;
+      } else if (q.phase === 'slope') {
+        const rl = s.roll, g = rl.pq[rl.pl], js = rollSteps(q.ri, q.si), r0 = W.R.runs[q.ri];
+        pts = [s._p, js.length ? r0.steps[js[js.length - 1]]._p : s._p]; mode = 'seg';
+        const pa = Math.round(Math.atan2(Math.abs(g.b), Math.abs(g.a)) * 1800 / Math.PI) / 10;
+        title = branchNote + `비스듬한 구간의 기울기: 빗금 삼각형의 두 변 길이(또는 각도)를 알면 넣어 주세요`;
+        body = `<div class="row wzs"><label>${AXW[g.p]} 변 <input id="wzl1" type="number" inputmode="numeric" value="${s.rollLegs ? s.rollLegs[0] : ''}" style="font-size:20px;width:130px"></label><label>${AXW[g.q]} 변 <input id="wzl2" type="number" inputmode="numeric" value="${s.rollLegs ? s.rollLegs[1] : ''}" style="font-size:20px;width:130px"></label><span class="mut">또는</span><label>각도 <input id="wzla" type="number" inputmode="decimal" placeholder="°" value="${s.rollDeg || ''}" style="font-size:20px;width:90px"></label><button data-wz="slope" class="pri big">다음 ▶</button></div>
+<div class="wzb">${btn('slope:45', '45° (두 변이 같음)')}${btn('slope:fig', '모름 — 그림 비율대로 (약 ' + pa + '°)', 'ghost')}</div>
+<p class="mut">각도는 ${AXW[g.p]} 방향에서 ${AXW[g.q]} 쪽으로 기운 각도입니다. 한 변만 알면 그 칸만 넣으세요(두 변이 같다고 봄). ${js.length > 1 ? '이 경사 구간에는 플랜지 등 지점이 ' + js.length + '개 있어서, 다음 질문에서 배관을 따라 잰 길이를 하나씩 묻습니다.' : '두 변을 넣으면 대각 길이도 자동으로 계산합니다.'}</p>`;
       } else if (q.phase === 'type') {
         pts = [s._p];
         const lg = symGuess(q.ri, q.si, 'type'), gv = lg ? lg.v : s.vguess;
@@ -931,11 +944,8 @@ RULES
         const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
         const rlg = rollOf(q.ri, q.si);
         const oc = s.ocr;
-        const g = rlg && rlg.pq && rlg.pq[rlg.pl];
-        title = branchNote + (g ? `비스듬한 구간(→ ${what}): 빗금 삼각형의 두 변 길이는 몇 mm 인가요?` : `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?`) + (oc ? ` <span class="wzt wzto">도면에서 읽은 값 <b>${oc.v}</b> (확신 ${oc.c}%)${oc.amb ? ' · 근처에 다른 숫자도 있음' : ''} — 맞으면 다음, 틀리면 고치세요</span>` : '');
-        body = g ? `<div class="row wzs"><label>${AXW[g.p]} 변 <input id="wzl1" type="number" inputmode="numeric" placeholder="예: 80" value="${s.legs ? s.legs[0] : oc ? oc.v : ''}" style="font-size:20px;width:150px"></label><label>${AXW[g.q]} 변 <input id="wzl2" type="number" inputmode="numeric" placeholder="같으면 비워 두기" value="${s.legs ? s.legs[1] : ''}" style="font-size:20px;width:150px"></label><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (그림 비율 사용)', 'ghost')}</div>
-        <p class="mut">한 변만 적혀 있으면 다른 칸은 비워 두세요 (두 변이 같다고 봄). 대각 길이 = √(변² + 변²), 엘보 각도도 두 변으로 계산합니다.</p>
-        <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>` : `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" value="${oc ? oc.v : ''}" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
+        title = branchNote + `두 빨간 원 사이(→ ${what}) 길이는 몇 mm 인가요?` + (rlg ? ' <span class="wzt">비스듬한 구간 — 배관을 따라 잰 길이</span>' : '') + (oc ? ` <span class="wzt wzto">도면에서 읽은 값 <b>${oc.v}</b> (확신 ${oc.c}%)${oc.amb ? ' · 근처에 다른 숫자도 있음' : ''} — 맞으면 다음, 틀리면 고치세요</span>` : '');
+        body = `<div class="row wzs"><input id="wzd" type="number" inputmode="numeric" placeholder="도면 치수 (예: ${s.d})" value="${oc ? oc.v : ''}" style="font-size:22px;width:300px"><button data-wz="len" class="pri big">다음 ▶</button>${btn('len:skip', '치수가 안 보임 (어림값 ' + s.d + ' 사용)', 'ghost')}</div>
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
@@ -1107,8 +1117,21 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
       const r0 = W.R.runs[q.ri], nx = r0.steps[q.si + 1];
       s.roll.pl = v; s.okRoll = true; s.rollPick = v;
       const flat = v === 'AX';
-      if (flat) { s.to = s.roll.alts.AX; delete s.eang; delete s.e45; if (nx) { nx.rollSeg = false; delete nx.eang; delete nx.e45; delete nx.legs; } }
-      else { if (nx) nx.rollSeg = true; rollApply(q.ri, q.si + 1, rollVec(s.roll, v, nx && nx.legs)); }
+      if (flat) { s.to = s.roll.alts.AX; delete s.eang; delete s.e45; rollSteps(q.ri, q.si).forEach(j => { const x = r0.steps[j]; x.rollSeg = false; if (x.t === 'elbow') { delete x.eang; delete x.e45; } }); }
+      else rollApply(q.ri, q.si, rollVec(s.roll, v, s.rollLegs));
+      wAdvance(); wRender(); return;
+    }
+    if (k === 'slope') {
+      const rl = s.roll, g = rl.pq[rl.pl]; let legs = null;
+      if (v === '45') legs = [1, 1];
+      else if (v === 'fig') legs = [Math.abs(g.a), Math.abs(g.b)];
+      else { let a1 = +$('wzl1').value, a2 = +$('wzl2').value, an = +$('wzla').value;
+        if (a1 > 0 || a2 > 0) { if (!(a1 > 0)) a1 = a2; if (!(a2 > 0)) a2 = a1; legs = [a1, a2]; s.rollLegs = [a1, a2]; }
+        else if (an > 0 && an < 90) { legs = [Math.cos(an * Math.PI / 180), Math.sin(an * Math.PI / 180)]; s.rollDeg = an; }
+        else { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '변 길이나 각도를 넣거나, 아래 버튼을 고르세요.'; return; } }
+      const vec = rollVec(rl, rl.pl, legs); rollApply(q.ri, q.si, vec); s.okSlope = true;
+      // 경사 구간이 한 토막이고 두 변을 알면 대각 길이도 바로
+      const js = rollSteps(q.ri, q.si); if (js.length === 1 && s.rollLegs) { const x = W.R.runs[q.ri].steps[js[0]]; x.d = Math.round(Math.hypot(s.rollLegs[0], s.rollLegs[1]) * 10) / 10; x.okLen = true; x.auto = 'user'; delete x.est; delete x.conf; }
       wAdvance(); wRender(); return;
     }
     if (k === 'size') { W.sizeAns = true; R.nps = +v; R.runs[0].nps = +v; const ln = $('wzln'), cl = $('wzcls'); if (ln) R.line_no = ln.value.trim(); if (cl) R.cls = +cl.value; const ce = $('wzce'); if (ce) R.ce = ce.value; wAdvance(); }
@@ -1129,13 +1152,6 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
       } else { s.nps2 = +v; s.okBranch = true; R.runs.forEach(x => { if (x.start && x.start.tee === s.id) x.nps = +v; }); wAdvance(); }
     }
     else if (k === 'len') {
-      const rlg = rollOf(q.ri, q.si);
-      if (rlg && $('wzl1')) {
-        if (v !== 'skip') { let a1 = +$('wzl1').value, a2 = +$('wzl2').value; if (!(a1 > 0) && a2 > 0) a1 = a2; if (!(a2 > 0)) a2 = a1; if (!(a1 > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '변 길이를 넣어 주세요.'; return; }
-          s.legs = [a1, a2]; const vec = rollVec(rlg, rlg.pl, s.legs); s.d = Math.round(vec.length() * 10) / 10; rollApply(q.ri, q.si, vec); s.auto = 'user'; delete s.est; delete s.conf; }
-        else { const vec = rollVec(rlg, rlg.pl); rollApply(q.ri, q.si, vec); s.auto = 'est'; }
-        s.okLen = true; wAdvance(); wRender(); return;
-      }
       if (v !== 'skip') { const el = $('wzd'), n = +(el && el.value); if (!(n > 0)) { W.hist.pop(); const m = $('wzmsg'); if (m) m.textContent = '숫자를 입력해 주세요. 치수가 안 보이면 "치수가 안 보임"을 누르세요.'; return; } s.d = n; delete s.conf; delete s.est; s.auto = s.ocr && +s.ocr.v === n ? 'ocr-ok' : 'user'; } else s.auto = 'est';
       s.okLen = true; wAdvance();
     }

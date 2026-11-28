@@ -95,7 +95,7 @@
       nums.forEach((n, ni) => {
         const adiff = (x, y) => { let q = Math.abs(((x - y) % 180 + 180) % 180); return Math.min(q, 180 - q); };
         let da = adiff(n.ang, sa), off = false;
-        if (s.rollSeg && s.legA) { const dl = Math.min(...s.legA.map(x => adiff(n.ang, x))); da = dl; off = true; } // 경사 구간: 빗금 삼각형 변(오프셋) 치수
+        if (s.rollSeg && s.legA && da > 18) { const dl = Math.min(...s.legA.map(x => adiff(n.ang, x))); da = dl; off = true; } // 경사 구간: 배관을 따라 잰 치수가 우선, 없으면 빗금 삼각형 변 치수
         if (da > 18) return;                                  // 글자 방향이 배관 방향과 같아야 함
         const v = [n.p[0] - p0[0], n.p[1] - p0[1]], t = (v[0] * u[0] + v[1] * u[1]) / L, d = Math.abs(v[0] * u[1] - v[1] * u[0]);
         if (t < -0.25 || t > 1.25 || d > 45) return;
