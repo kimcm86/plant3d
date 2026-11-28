@@ -25,7 +25,7 @@ header .hbig{background:#0f766e;color:#fff;border-color:#0f766e;font-weight:600}
 .menu .mp{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:40;min-width:260px;background:var(--pn);border:1px solid var(--bd);border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.16);padding:6px}
 .menu.open .mp{display:block}.menu .mp button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;margin:0}
 .menu .mp button:hover{background:rgba(15,118,110,.08)}.menu .mp b{display:block;font-size:14px;font-weight:600}.menu .mp span{display:block;font-size:12px;color:var(--mut);margin-top:1px}
-.hq{margin-left:4px}#helpp{position:fixed;right:12px;top:52px;z-index:45;background:var(--pn);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:10px 16px;font-size:13px;max-width:420px}#helpp ul{margin:4px 0 8px;padding-left:18px}
+.hq{margin-left:4px}.clst input,.clst select{font-size:12.5px;padding:3px 5px;border:1px solid var(--bd);border-radius:4px;background:var(--in)}.clst td{padding:3px 4px}.clst th{font-size:12px;white-space:nowrap}.isosh{gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 8px}.isosh .isep{width:1px;height:22px;background:var(--bd);margin:0 4px}.isosh .mut{font-size:12.5px}#helpp{position:fixed;right:12px;top:52px;z-index:45;background:var(--pn);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:10px 16px;font-size:13px;max-width:420px}#helpp ul{margin:4px 0 8px;padding-left:18px}
 #pal .ps{width:100%;box-sizing:border-box;padding:6px 8px;margin-bottom:6px;border:1px solid var(--bd);border-radius:6px;background:var(--in)}
 #pal .pg h4{cursor:pointer;user-select:none;display:flex;justify-content:space-between}#pal .pg h4::after{content:'▾'}#pal .pg.cl h4::after{content:'▸'}#pal .pg.cl .gg{display:none}
 #pal .gg{display:grid;grid-template-columns:1fr 1fr;gap:4px}#pal .gg button{margin:0;padding:6px 5px;font-size:12.5px;line-height:1.25;text-align:center;min-height:34px}
@@ -69,9 +69,9 @@ button.pri{background:#0f766e;color:#fff;border-color:#0f766e}
 <header><b>PLANT 3D</b><span id="ver"></span>
 <div class="hg"><button id="jobn" title="작업 목록 / 새 작업">작업: -</button><button id="jsave" class="pri">저장</button><button id="undo" title="되돌리기 (Ctrl+Z)" disabled>↶</button><button id="redo" title="다시하기 (Ctrl+Y)" disabled>↷</button><span id="jst" class="mut"></span></div>
 <div class="hg"><button id="bat" class="hbig" title="ISO 도면 PDF를 3D로 바꾸기 · 도면·사진 첨부">📄 ISO 도면 → 3D</button>
-<div class="menu"><button class="mb">📐 도면 ▾</button><div class="mp"><button id="biso"><b>ISO 도면 만들기</b><span>고른 배관 라인을 ISO로 · 장 나누기 · PDF</span></button><button id="bortho"><b>평면·입면도</b><span>위·앞·옆에서 본 도면</span></button><button id="bxyz"><b>📍 실제 좌표에 놓기</b><span>부품을 고르고 E·N·EL 좌표로 옮기기</span></button></div></div>
+<div class="menu"><button class="mb">📐 도면 ▾</button><div class="mp"><button id="biso"><b>ISO 도면 만들기</b><span>고른 배관 라인을 ISO로 · 장 나누기 · PDF</span></button><button id="bspool"><b>🧩 스풀 도면 (제작용)</b><span>스풀 번호 · 절단 길이 · 용접 번호</span></button><button id="bcls"><b>📋 자재 사양 (라인 클래스)</b><span>회사 배관 사양 등록 · 라인에 적용</span></button><button id="bortho"><b>평면·입면도</b><span>위·앞·옆에서 본 도면</span></button><button id="bxyz"><b>📍 실제 좌표에 놓기</b><span>부품을 고르고 E·N·EL 좌표로 옮기기</span></button></div></div>
 <div class="menu"><button class="mb">✔ 검사 ▾</button><div class="mp"><button id="bchk"><b>모델 검사</b><span>안 붙은 끝·크기 안 맞음·라인 번호 빠짐</span></button><button id="bclash"><b>간섭 체크</b><span>배관·장치·철골끼리 부딪히는 곳</span></button></div></div>
-<div class="menu"><button class="mb">📦 내보내기 ▾</button><div class="mp"><button id="bxls"><b>엑셀 (자재·용접)</b><span>MTO 자재표 · 용접 대장</span></button><button id="bj"><b>가스켓·조인트 목록</b><span>플랜지 이음마다 가스켓·볼트</span></button><button id="bd"><b>파일 백업 · 열기</b><span>작업을 파일로 저장 / 불러오기</span></button></div></div></div>
+<div class="menu"><button class="mb">📦 내보내기 ▾</button><div class="mp"><button id="bxls"><b>엑셀 (자재·용접)</b><span>MTO 자재표 · 용접 대장</span></button><button id="bdxf"><b>DXF — ISO 도면</b><span>CAD에서 여는 도면 (A3, 장마다 나란히)</span></button><button id="bdxf3"><b>DXF — 3D 중심선</b><span>배관 중심선 3D 선 (라인 번호별 레이어)</span></button><button id="bpcf"><b>PCF — 배관 데이터</b><span>Isogen·Plant 3D·응력 해석용, 라인별</span></button><button id="bj"><b>가스켓·조인트 목록</b><span>플랜지 이음마다 가스켓·볼트</span></button><button id="bd"><b>파일 백업 · 열기</b><span>작업을 파일로 저장 / 불러오기</span></button></div></div></div>
 <span id="leg" title="시공 상태 색 (오른쪽 아래 '상태색'으로 켜고 끔)"></span><button id="bhelp" class="hq" title="조작법">? 조작법</button></header>
 <div id="helpp" hidden><b>마우스</b><ul><li>빈 곳 드래그: 돌려 보기 · Shift/오른쪽 드래그: 화면 이동</li><li>휠: 마우스가 가리킨 곳으로 확대·축소</li><li>부품 드래그: 바닥 위로 이동 · Alt(또는 Z)+드래그: 높이</li></ul><b>선택</b><ul><li>클릭: 하나 · Ctrl+클릭: 하나씩 추가 · 빈 곳 Ctrl+드래그: 네모로 여러 개</li><li>부품 클릭 후 A: 연결된 배관·부품 모두</li></ul><b>키보드</b><ul><li>방향키·Q/E: 조금씩 이동 · R: 90° 돌리기 · F: 전체 보기 · Delete: 지우기 · Ctrl+Z/Y: 되돌리기/다시</li></ul></div>
 <main>
@@ -164,7 +164,7 @@ const gopt=g=>Object.entries(GK).map(([k,v])=>`<option value='${k}'${k===g?' sel
 function rgk(){while(gk.children.length){const c=gk.children.pop();c.geometry.dispose()}for(const j of joints()){const d=jget(j),fo=fl(j.nps,j.cls)[0],rj=(d.g==='rtj'||j.face==='RTJ')?rjd(j.nps,j.cls):null;let mm;if(rj){mm=new THREE.Mesh(new THREE.TorusGeometry(rj.P/2*S,rj.F*.42*S,8,64),new THREE.MeshStandardMaterial({color:GK.rtj[1],roughness:.45,metalness:.6}));mm.quaternion.setFromUnitVectors(V(0,0,1),j.d)}else{const ro=j.face==='FF'?fo/2:(RFD(j.nps)||fo*.5)/2;mm=new THREE.Mesh(new THREE.CylinderGeometry(ro*S,ro*S,3.2*S,32),new THREE.MeshStandardMaterial({color:GK[d.g][1],roughness:.8}));mm.quaternion.setFromUnitVectors(V(0,1,0),j.d)}mm.position.set(j.p[0]*S,j.p[1]*S,j.p[2]*S);mm.userData.joint=j.id;gk.add(mm)}}
 function jhtml(id){const j=joints().find(x=>x.id===id);if(!j)return`<p class='mut'>조인트를 찾을 수 없습니다.</p>`;const d=jget(j);return`<h4>플랜지 조인트</h4><div class='mut'>${j.a.tag} ↔ ${j.b.tag} · NPS ${j.nps} · Class ${j.cls} · ${j.face}</div><div class='f'><label>가스켓</label><select data-j='${id}' data-jk='g'>${gopt(d.g)}</select></div><div class='f'><label>재질</label><input data-j='${id}' data-jk='mt' value='${d.mt||GK[d.g][2]}'></div><div class='f'><label>볼트 사양</label><input data-j='${id}' data-jk='bt' placeholder='기본값 사용' value='${d.bt||''}'></div><div class='f'><label>볼트</label><span>${jb(j)}</span></div>${d.g==='rtj'?`<div class='f'><label>링 번호</label><span>${ringTxt(j)||'-'}</span></div>`:''}<div class='f'><label>상태</label><select data-j='${id}' data-jk='st'>${sopt(d.st)}</select></div>`}
 function ojh(o){return joints().filter(j=>j.a===o||j.b===o).map(j=>`<div class='f'><label>가스켓 (${(j.a===o?j.b:j.a).tag})</label><select data-j='${j.id}' data-jk='g'>${gopt(jget(j).g)}</select></div>`).join('')}
-function ov(t,h){$('iso3').hidden=false;$('isop').hidden=false;$('isot').textContent=t;$('isob').innerHTML=h;$('iso').hidden=false}
+function ov(t,h,plain){$('iso3').hidden=!!plain;$('isop').hidden=!!plain;if($('isoall'))$('isoall').hidden=!!plain;$('isot').textContent=t;$('isob').innerHTML=h;$('iso').hidden=false}
 function jlist(){const js=joints(),c0={};js.forEach(j=>{const g=jget(j).g;c0[g]=(c0[g]||0)+1});ov('플랜지 조인트 · 가스켓 목록 ('+js.length+'개)',js.length?`<table><tr><th>조인트</th><th>NPS / Class</th><th>가스켓</th><th>재질</th><th>볼트</th><th>상태</th></tr>${js.map(j=>{const d=jget(j);return`<tr><td>${j.id.replace('|',' ↔ ')}</td><td>${j.nps} / ${j.cls}</td><td><select data-j='${j.id}' data-jk='g'>${gopt(d.g)}</select></td><td><input data-j='${j.id}' data-jk='mt' value='${d.mt||GK[d.g][2]}'></td><td>${jb(j)}</td><td><select data-j='${j.id}' data-jk='st'>${sopt(d.st)}</select></td></tr>`}).join('')}</table><p class='mut'>${Object.entries(c0).map(([k,v])=>GK[k][0]+' '+v+'개').join(' · ')}</p>`:`<p class='mut'>아직 볼팅으로 연결된 플랜지가 없습니다. 플랜지(또는 플랜지 밸브)를 선택한 채로 "+ 플랜지"를 누르면 맞플랜지가 붙고 가스켓이 생깁니다.</p>`)}
 const GKE={swg:'SPIRAL WOUND 316SS GRAPHITE',rf:'NON-ASBESTOS RF',ff:'NON-ASBESTOS FF',rtj:'RING JOINT SOFT IRON',ptfe:'PTFE ENVELOPE'};
 const DM0={title:'',wp:'',area:'',unit:'',pid:'',wo:'-',wps:'',ccn:'',dp:'',dt:'',op:'',ot:'',hy:'',pn:'',pt:'100',rt:'100',fab:'',icode:'',pcode:'',ps:'A106-B SMLS SCH80',fs:'A234-WPB SMLS SCH80',fls:'A105',sch:'SCH80',vs:'A216-WCB',bs:'STUD-BOLT A193 GR B7M W/A194 GR 2HM NUTS',ow:'',co:'',rev:'0',rd:'ISSUED',dr:'',ck:'',ap:'',nt:'',ptg:'',ins:'N',et:'N',ht:'N',st:'',sc:'N',ic:'N',ff:'N',sf:'Y',pw:'N'};
@@ -201,7 +201,13 @@ function bomItems(set,dme,js,ids){
  js.forEach(j=>{const g=jget(j),nb=fl(j.nps,j.cls)[2],bd=bdia(j.nps,j.cls);add('GASKET',nf(j.nps),`${g.mt||GKE[g.g]}${g.g==='rtj'&&ringTxt(j)?' '+ringTxt(j):''} ${j.cls}#${!g.mt&&g.g==='swg'?' IR-316SS & OR-CS':''}`,1);add('STUD/BOLT',bd+'"X'+fmtIn(studIn(j)),g.bt||dme.bs,nb)});
  const items=Object.values(bm).sort((p,q)=>(BOMORD.indexOf(p.code)+1||99)-(BOMORD.indexOf(q.code)+1||99));
  return items}
-let isoPg=0,isoCut=false,isoKeyLast=null;
+let isoPg=0,isoCut=false,isoKeyLast=null,isoSpool=false;
+/* 제작 스풀: 공장 용접으로 이어진 덩어리(플랜지 볼트 이음·밸브·현장 용접에서 나뉨) */
+const NOSP=['valve','inst','psv','trap','strainer'];
+function spoolsOf(set,key){const fw=new Set((dm[key]||{}).fw||[]),W=welds().filter(w=>set.includes(w.a)&&set.includes(w.b)&&!w.field&&!fw.has([w.a.id,w.b.id].sort((x,y)=>x-y).join('|')));
+ const cand=set.filter(o=>!NOSP.includes(o.type)&&!o.ex),adj=new Map(cand.map(o=>[o,[]]));W.forEach(w=>{if(adj.has(w.a)&&adj.has(w.b)){adj.get(w.a).push(w.b);adj.get(w.b).push(w.a)}});
+ const left=new Set(cand),out=[];cand.slice().sort((p,q)=>p.id-q.id).forEach(o=>{if(!left.has(o))return;const g=[o],st=[o];left.delete(o);while(st.length){const c=st.pop();adj.get(c).forEach(x=>{if(left.has(x)){left.delete(x);g.push(x);st.push(x)}})}if(g.some(x=>x.type==='pipe'))out.push(g)});return out}
+const spNo=(ln,i)=>(ln||'LINE')+'-SP'+String(i+1).padStart(2,'0');
 /* 도면 안 글자끼리 겹치면 글자 기준선의 수직 방향으로 조금씩 비켜 놓음 */
 function declutter(s){const re=/<text x='(-?[\d.]+)' y='(-?[\d.]+)' font-size='([\d.]+)' text-anchor='(\w+)'([^>]*)>([^<]*)<\/text>/g,T=[];let m;
  while((m=re.exec(s))){const x=+m[1],y=+m[2],fz=+m[3];if(x>785||y>685||fz>11)continue;const rm=m[5].match(/rotate\((-?[\d.]+) /),r=rm?+rm[1]*Math.PI/180:0,w=[...m[6].replace(/&[a-z#0-9]+;/g,'x')].reduce((a,c)=>a+(c.charCodeAt(0)>255?1:.58),0)*fz,an=m[4];T.push({i:m.index,len:m[0].length,src:m[0],x,y,fz,r,w,an,dx:0,dy:0})}
@@ -219,7 +225,7 @@ function iso(mode){lastIso=mode;
  const set0=(mode==='sel'?bs:[...new Set(bs.flatMap(x=>line(x)))]).filter(x=>LIN.includes(x.type)),pj=p=>[(p[0]-p[2])*.866,-p[1]+(p[0]+p[2])*.5];
  const ln=(set0.find(x=>x.ln)||{}).ln||'',key=ln||'_';if(key!==isoKeyLast){isoPg=0;isoKeyLast=key}curKey=key;
  /* 장 나누기: 사용자가 끊은 연결(cuts)로 나눈 덩어리 = 한 장 */
- const SH=mode==='sel'?[set0]:isoSheets(set0,key);if(isoPg>=SH.length)isoPg=SH.length-1;if(isoPg<0)isoPg=0;
+ const SPm=isoSpool&&mode!=='sel',SP0=SPm?spoolsOf(set0,key):null,SH=mode==='sel'?[set0]:SPm?(SP0.length?SP0:[set0]):isoSheets(set0,key);if(isoPg>=SH.length)isoPg=SH.length-1;if(isoPg<0)isoPg=0;
  const set=SH[isoPg],shTxt=(isoPg+1)+'/'+SH.length;isoIds=set.map(x=>x.id);
  const dme=Object.assign({},DM0,dm[key]||{});if(!dme.st)dme.st=set.some(x=>x.trace)?'Y':'N';
  const mkcp=x=>{const pts=cpts(x),ex=[];if(x.type==='tee'){const pq=ports(x),a=pts[0],b=pts[1];ex.push([[(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2],pq[1].p])}return{x,pts,ex}},cp=set.map(mkcp);
@@ -333,6 +339,7 @@ function iso(mode){lastIso=mode;
  s+=C_(800,20,370,22,'BILL OF MATERIAL',14,true);['CODE','SIZE',"Q'TY",'DESCRIPTION'].forEach((hd,i)=>{s+=C_(bxs[i],42,bxs[i+1]-bxs[i],16,hd,8,true)});
  for(let i=0;i<rows;i++){const y=58+i*rh,it=items[i],v=it?[it.code,it.size,it.code==='PIPE'?it.q.toFixed(2)+' m':(Number.isInteger(it.q)?it.q:it.q.toFixed(2)),it.desc]:['','','',''];for(let c=0;c<4;c++)s+=C_(bxs[c],y,bxs[c+1]-bxs[c],rh,v[c],fz,false,c===3?'l':null)}
  /* 보온/트레이싱/비고/노트 */
+ if(!SPm){
  const iy=378,icw=[54,56,50,56,50,54,50],icx=[800];icw.forEach((w,i)=>icx.push(icx[i]+w));
  s+=C_(800,iy,370,16,'INSULATION DATA',10,true)+C_(800,iy+16,icx[3]-800,13,'MATERIAL',8,true)+C_(icx[3],iy+16,1170-icx[3],13,'THICKNESS',8,true);
  ['CODE','SIZE',"Q'TY",'SIZE',"Q'TY",'SIZE',"Q'TY"].forEach((hd,i)=>{s+=C_(icx[i],iy+29,icw[i],13,hd,7,true)});
@@ -340,7 +347,21 @@ function iso(mode){lastIso=mode;
  s+=C_(800,472,370,16,'TRACING BILL OF MATERIAL',9,true);
  for(let r=0;r<3;r++){let xx=800;[90,60,60,160].forEach(w=>{s+=R_(xx,488+r*14,w,14);xx+=w})}
  s+=C_(800,536,55,30,'비 고',9,true)+C_(855,536,157,15,'㎡',7)+C_(1012,536,158,15,'㎡',7)+C_(855,551,157,15,'')+C_(1012,551,158,15,'TOTAL ㎡',7);
- s+=R_(800,570,370,80)+T_(808,582,'NOTES:',9,'start',true);
+ }else{
+  /* 스풀: 절단표(CUT LIST) · 용접표(WELD LIST) */
+  const pcs=set.filter(o=>o.type==='pipe').sort((p,q)=>p.id-q.id),WS=welds().filter(w=>set.includes(w.a)||set.includes(w.b)),fwk=new Set((dm[key]||{}).fw||[]);
+  s+=C_(800,378,185,16,'CUT LIST',10,true)+C_(985,378,185,16,'WELD LIST',10,true);
+  [['PC',30],['SIZE',45],['CUT LENGTH (mm)',110]].reduce((x,[h,w])=>{s+=C_(x,394,w,13,h,7,true);return x+w},800);
+  [['NO.',45],['SIZE',40],['TYPE',40],['S/F',60]].reduce((x,[h,w])=>{s+=C_(x,394,w,13,h,7,true);return x+w},985);
+  const nr=12,rh2=(566-407)/nr;
+  for(let k=0;k<nr;k++){const y=407+k*rh2,pc=pcs[k],w=WS[k];[30,45,110].reduce((x,ww,c)=>{s+=C_(x,y,ww,rh2,pc?[('P'+(k+1)),nf(pc.nps),String(Math.round(pc.len))][c]:'',7.5);return x+ww},800);
+   [45,40,40,60].reduce((x,ww,c)=>{const f=w&&(w.field||fwk.has([w.a.id,w.b.id].sort((p,q)=>p-q).join('|')));s+=C_(x,y,ww,rh2,w?[w.no.replace('W-',''),nf(w.nps),w.kind,f?'FIELD':'SHOP'][c]:'',7.5);return x+ww},985)}
+  if(pcs.length>nr||WS.length>nr)s+=T_(808,563,'※ 표에 다 못 넣은 항목은 엑셀(스풀 시트)에 있습니다',6.5,'start');
+  /* 도면 위: 배관 조각 번호 · 용접 번호 */
+  pcs.forEach((o,k)=>{const pp=ports(o),m=tf([(pp[0].p[0]+pp[1].p[0])/2,(pp[0].p[1]+pp[1].p[1])/2,(pp[0].p[2]+pp[1].p[2])/2]);s+=`<rect x='${f1(m[0]+5)}' y='${f1(m[1]+4)}' width='16' height='10' fill='#fff' stroke='#111' stroke-width='.5'/>`+T_(m[0]+13,m[1]+12,'P'+(k+1),7,'middle',true)});
+  WS.forEach(w=>{const q=tf(w.p),f=w.field||fwk.has([w.a.id,w.b.id].sort((p,q2)=>p-q2).join('|')),c=[q[0]-12,q[1]-12];s+=`<g data-fw='${[w.a.id,w.b.id].sort((p,q2)=>p-q2).join('|')}' style='cursor:pointer'><line x1='${f1(q[0])}' y1='${f1(q[1])}' x2='${f1(c[0]+4)}' y2='${f1(c[1]+4)}' stroke='#111' stroke-width='.4'/>${f?`<path d='M${f1(c[0])} ${f1(c[1]-7)}l6.5 11h-13z' fill='#fff' stroke='#111' stroke-width='.6'/>`:`<circle cx='${f1(c[0])}' cy='${f1(c[1])}' r='6.5' fill='#fff' stroke='#111' stroke-width='.6'/>`}<text x='${f1(c[0])}' y='${f1(c[1]+2.5)}' font-size='6' text-anchor='middle'>${+w.no.replace('W-','')}</text></g>`});
+ }
+ s+=R_(800,570,370,80)+T_(808,582,'NOTES:',9,'start',true);if(SPm)s+=T_(1162,584,'SPOOL NO. '+spNo(ln,isoPg),11,'end',true);
  (dme.nt||'').split('\n').slice(0,6).forEach((tt,i)=>{s+=T_(808,596+i*12,tt,8,'start',false,355)});
  s+=R_(800,654,370,52)+T_(985,688,dme.ow,22,'middle',true,350)+R_(800,710,370,50)+T_(985,742,dme.co,20,'middle',true,350);
  /* 표제란 */
@@ -360,7 +381,7 @@ function iso(mode){lastIso=mode;
  [['DESIGN',dme.dp,dme.dt],['OPERATION',dme.op,dme.ot],['HYDROSTATIC TEST',dme.hy,''],['PNEUMATIC TEST',dme.pn,'']].forEach(([lb,p,tt],i)=>{const y=722+i*25;s+=C_(390,y,50,25,lb,6.5,true)+C_(440,y,45,25,p,8)+C_(485,y,35,25,tt,8)});
  s+=C_(520,710,70,12,'')+C_(520,722,28,25,'AREA',6,true)+C_(548,722,42,25,dme.area,8)+C_(520,747,28,25,'UNIT',6,true)+C_(548,747,42,25,dme.unit,8)+C_(520,772,70,12,'P&ID NO.',6,true)+C_(520,784,70,38,dme.pid,7);
  /* 승인란 + 개정표 */
- s+=C_(598,616,95,16,'장치',9,true)+C_(693,616,95,16,'생산',9,true)+R_(598,632,95,58)+R_(693,632,95,58);
+ /* 장치·생산 서명칸은 쓰지 않음 */
  const rw=[18,22,30,56,22,22,22],rx=[598];rw.forEach((w,i)=>rx.push(rx[i]+w));
  const dtn=new Date(),ds=dtn.getFullYear()+'.'+(dtn.getMonth()+1)+'.'+dtn.getDate();
  for(let r=0;r<5;r++){const y=692+r*21.6,vals=r===4?['',dme.rev,ds,dme.rd,dme.dr,dme.ck,dme.ap]:['','','','','','',''];rw.forEach((w,i)=>{s+=C_(rx[i],y,w,21.6,vals[i],6.5,false)});s+=`<polygon points='${rx[0]+2},${f1(y+18.6)} ${rx[0]+9},${f1(y+3)} ${rx[0]+16},${f1(y+18.6)}' fill='none' stroke='#111' stroke-width='.7'/>`}
@@ -384,7 +405,7 @@ function iso(mode){lastIso=mode;
   lab(A,Cq,v[i0]);lab(Cq,B,v[i1])});
  s=declutter(s);
  const ptTxt=ptCheck(set,dme);const fm=`<details ${dOpen?'open':''}><summary>도면 정보 입력 (표제란, 설계조건, 자재 사양)</summary><div class='dmf'>${DMF.map(([kk,l])=>`<label>${l}<input data-d='${kk}' value='${E(dme[kk])}'></label>`).join('')}${DMY.map(([kk,l])=>`<label>${l}<select data-d='${kk}'><option${dme[kk]==='Y'?' selected':''}>Y</option><option${dme[kk]==='N'?' selected':''}>N</option></select></label>`).join('')}<label style='grid-column:1/-1'>NOTES (줄바꿈으로 구분)<textarea data-d='nt' rows='3'>${E(dme.nt)}</textarea></label></div></details>${ptTxt}`;
- const shBar=mode==='sel'?'':`<div class='row isosh'>${SH.length>1?`<button data-ispg='-1'${isoPg?'':' disabled'}>◀</button><b>${shTxt} 장</b><button data-ispg='1'${isoPg<SH.length-1?'':' disabled'}>▶</button>`:`<span class='mut'>1장</span>`}<button data-isocut class='${isoCut?'pri':''}'>✂ 장 나누기${isoCut?' — 끊을 연결점(주황 원)을 누르세요, 다시 누르면 취소':''}</button>${((dm[key]||{}).cuts||[]).length?`<button data-isocut0>나누기 모두 지우기</button>`:''}</div>`;
+ const nCut=((dm[key]||{}).cuts||[]).length,shBar=mode==='sel'?'':`<div class='row isosh'>${SH.length>1?`<button data-ispg='-1'${isoPg?'':' disabled'}>◀</button><b>${SPm?'스풀 '+spNo(ln,isoPg)+' · ':''}${shTxt}</b><button data-ispg='1'${isoPg<SH.length-1?'':' disabled'}>▶</button>`:`<span class='mut'>${SPm?'스풀 1개':'1장'}</span>`}<span class='isep'></span><button data-isospool class='${isoSpool?'pri':''}' title='공장 제작 단위(스풀)로 나눠 절단 길이·용접 번호 표시'>🧩 스풀 도면</button>${isoSpool?`<span class='mut'>용접 번호를 누르면 현장 용접(FIELD, △)으로 바뀌고 거기서 스풀이 나뉩니다</span>`:`<button data-isocut class='${isoCut?'pri':''}'>✂ 장 나누기</button>${isoCut?`<span class='mut'>끊을 연결점(주황 원)을 누르세요 · 다시 누르면 취소</span>`:''}${nCut?`<button data-isocut0>나누기 모두 지우기</button>`:''}`}</div>`;
  ov('ISO 도면 · '+(ln||'(라인 번호 미지정)')+(SH.length>1?' · '+shTxt:''),fm+shBar+`<svg viewBox='0 0 1190 842' font-family='Malgun Gothic, Noto Sans KR, Arial, sans-serif'>${s}</svg>`)}
 function tgl(id){let l=ml.length?ml.slice():(sid!=null?[sid]:[]);const i=l.indexOf(id);if(i>=0)l.splice(i,1);else l.push(id);sj=null;if(l.length>1){ml=l;sid=null}else{ml=[];sid=l.length?l[0]:null}hl();rp()}
 function mhtml(){return`<h4>${ml.length}개 선택됨</h4><div class='f'><label>시공 상태</label><select data-m='st'><option value=''>변경…</option>${Object.keys(ST).map(x=>`<option>${x}</option>`).join('')}</select></div><div class='f'><label>라인 번호</label><input data-m='ln' placeholder='일괄 입력'></div><div class='f'><label>재질/규격</label><input data-m='spec' placeholder='일괄 입력'></div><div class='row'><span class='mut'>높이</span><button data-dy='-100'>−100</button><button data-dy='-10'>−10</button><button data-dy='10'>+10</button><button data-dy='100'>+100</button></div><div class='row'><span class='mut'>다른 부품에 맞춤</span><button data-al='1'>높이</button><button data-al='0'>X</button><button data-al='2'>Z</button></div><div class='row'><button id='misos'>선택 부품 ISO</button><button id='miso'>연결 라인 전체 ISO</button></div><div class='row'><button id='mlink'>연결된 것 모두 선택</button><button id='mjoin' class='pri'>끝을 다른 부품에 붙이기</button></div><div class='row'><span class='mut'>90° 돌리기</span><button data-rot='y-1' title='위에서 보아 시계 반대 방향 (R)' style='min-width:38px'>⟲</button><button data-rot='y1' title='위에서 보아 시계 방향 (Shift+R)' style='min-width:38px'>⟳</button><button data-rot='x1'>X축</button><button data-rot='z1'>Z축</button></div><div class='row'><button id='mdup'>복제</button><button id='mdel'>삭제</button></div><p class='mut'>아무 부품이나 드래그하면 선택한 것이 함께 이동합니다. 여러 개 고르기: 부품 클릭 후 <b>A</b> 키(연결된 것 모두), 빈 곳에서 <b>Ctrl+드래그</b>(네모로 고르기), Ctrl+클릭(하나씩 추가·해제), Ctrl+A(전체). <b>R</b> 키: 수평 90° 돌리기.</p>`}
@@ -468,9 +489,10 @@ function clashes(){const L=objs.filter(o=>LIN.includes(o.type)),E=objs.filter(o=
 function clashUI(){const R=clashes();if(!R.length){ov('간섭 체크',`<p style='font-size:16px'>✔ 겹치는 곳이 없습니다.</p><p class='mut'>배관·밸브·플랜지 등은 중심선과 외경으로, 장치는 바깥 상자로 확인합니다. 서로 이어진 부품과 바로 옆 부품은 제외합니다.</p>`);return}
  ov('간섭 체크 — '+R.length+'곳',`<p class='mut'>줄을 누르면 3D에서 그 두 부품을 보여줍니다. 배관끼리는 겹친 깊이(mm)를, 장치는 바깥 상자 기준으로 표시합니다.</p><table class='cl'><tr><th>#</th><th>부품 1</th><th>부품 2</th><th>겹침</th><th>위치 (X, Y, Z mm)</th></tr>${R.map((x,i)=>`<tr data-cl='${x.a.id},${x.b.id}'><td>${i+1}</td><td>${EH(x.a.tag)} <span class='mut'>${T[x.a.type].n} ${x.a.nps?nf(x.a.nps):''}${x.a.ex?' (기존)':''}</span></td><td>${EH(x.b.tag)} <span class='mut'>${T[x.b.type].n} ${x.b.nps?nf(x.b.nps):''}${x.b.ex?' (기존)':''}</span></td><td>${x.ov!=null?x.ov+' mm':'장치와 겹침'}</td><td>${x.c.map(v=>Math.round(v)).join(', ')}</td></tr>`).join('')}</table>`);$('iso3').hidden=true;$('isop').hidden=true;lg('간섭 체크: '+R.length+'곳')}
 /* 전체 라인 ISO를 한 번에 인쇄/PDF */
-function isoAllPDF(){const lin=objs.filter(o=>LIN.includes(o.type)&&!o.ex),seen=new Set(),sh=[],keep=[sid,ml.slice()];
- for(const o of lin){if(seen.has(o.id))continue;const l=line(o);l.forEach(x=>seen.add(x.id));ml=l.map(x=>x.id);sid=l.length===1?l[0].id:null;if(l.length===1)ml=[];const kc=isoCut;isoCut=false;let nP=1;for(let pg=0;pg<nP;pg++){isoPg=pg;try{iso('line')}catch(e){break}const sv=$('isob').querySelector('svg');if(sv)sh.push(sv.outerHTML);nP=isoSheets(l.filter(x=>LIN.includes(x.type)),curKey).length}isoCut=kc;isoPg=0}
- sid=keep[0];ml=keep[1];hl();rp();$('iso').hidden=true;if(!sh.length){ov('ISO PDF',`<p class='mut'>배관 부품이 없습니다.</p>`);return}
+function isoSVGs(){const lin=objs.filter(o=>LIN.includes(o.type)&&!o.ex),seen=new Set(),sh=[],keep=[sid,ml.slice()];
+ for(const o of lin){if(seen.has(o.id))continue;const l=line(o);l.forEach(x=>seen.add(x.id));ml=l.map(x=>x.id);sid=l.length===1?l[0].id:null;if(l.length===1)ml=[];const kc=isoCut;isoCut=false;let nP=1;for(let pg=0;pg<nP;pg++){isoPg=pg;try{iso('line')}catch(e){break}const sv=$('isob').querySelector('svg');if(sv)sh.push(sv.outerHTML);{const L2=l.filter(x=>LIN.includes(x.type));nP=isoSpool?Math.max(1,spoolsOf(L2,curKey).length):isoSheets(L2,curKey).length}}isoCut=kc;isoPg=0}
+ sid=keep[0];ml=keep[1];hl();rp();$('iso').hidden=true;return sh}
+function isoAllPDF(){const sh=isoSVGs();if(!sh.length){ov('ISO PDF',`<p class='mut'>배관 부품이 없습니다.</p>`);return}
  const j=jobs.find(x=>x.id===cur),fr=document.createElement('iframe');fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(fr);const d=fr.contentDocument;
  d.open();d.write(`<!doctype html><html><head><meta charset='utf-8'><title>${EH(j?j.name:'PLANT 3D')} ISO</title><style>@page{size:A3 landscape;margin:6mm}html,body{margin:0}.pg{page-break-after:always;break-after:page;height:calc(297mm - 12mm);display:flex;align-items:center;justify-content:center}.pg:last-child{page-break-after:auto;break-after:auto}.pg svg{width:100%;height:100%}</style></head><body>${sh.map(x=>`<div class='pg'>${x}</div>`).join('')}<\/body><\/html>`);d.close();
  window.__isoPages=sh.length;lg('전체 ISO '+sh.length+'장 인쇄/PDF');setTimeout(()=>{try{fr.contentWindow.focus();fr.contentWindow.print()}catch(e){}setTimeout(()=>fr.remove(),60000)},300)}
@@ -515,11 +537,97 @@ function xlsData(){const dme=Object.assign({},DM0),LS=allLines(),all=LS.flatMap(
  const di=W.reduce((a,w)=>a+(+w.nps||0),0),dd=W.filter(w=>w.done).reduce((a,w)=>a+(+w.nps||0),0);wl.push([]);wl.push(['합계','','','',W.length+'개소','',Math.round(di*100)/100]);wl.push(['완료','','','',W.filter(w=>w.done).length+'개소','',Math.round(dd*100)/100,'','','','진척률',di?Math.round(dd/di*1000)/10+'%':'-']);
  const gk=[['조인트','라인 번호','사이즈','등급','가스켓','볼트 수량','볼트 규격','부품 1','부품 2']];js.forEach((j,i)=>{const g=jget(j),nb=fl(j.nps,j.cls)[2];gk.push(['J-'+String(i+1).padStart(3,'0'),j.a.ln||j.b.ln||'',nf(j.nps),j.cls+'#',g.mt||GKE[g.g],nb,bdia(j.nps,j.cls)+'" × '+fmtIn(studIn(j)),j.a.tag,j.b.tag])});
  const pl=[['태그','종류','사이즈','라인 번호','재질/규격','시공 상태','기존 배관','길이(mm)','X','Y','Z','사진','메모']];objs.forEach(o=>pl.push([o.tag,T[o.type]?T[o.type].n:o.type,o.nps?nf(o.nps):'',o.ln||'',o.spec||'',o.status||'',o.ex?'예':'',o.len||'',...o.pos.map(v=>Math.round(v)),(PH[o.id]||[]).length||'',o.note||'']));
- return{mto,byl,wl,gk,pl,W}}
+ const sp=[['스풀 번호','라인 번호','조각','사이즈','절단 길이(mm)','부품 수','용접(공장)','용접(현장)']];
+ LS.forEach(l=>{const key=l.ln||'_',fw=new Set((dm[key]||{}).fw||[]);spoolsOf(l.set.filter(x=>LIN.includes(x.type)),key).forEach((g,i)=>{const no=spNo(l.ln,i),ws=W.filter(w=>g.includes(w.a)||g.includes(w.b)),f=ws.filter(w=>w.field||fw.has([w.a.id,w.b.id].sort((p,q)=>p-q).join('|')));
+  g.filter(o=>o.type==='pipe').sort((p,q)=>p.id-q.id).forEach((o,k)=>sp.push([no,l.ln,'P'+(k+1),nf(o.nps),Math.round(o.len),k?'':g.length,k?'':ws.length-f.length,k?'':f.length]))})});
+ return{mto,byl,wl,gk,pl,W,sp}}
 async function xlsExport(){let X;try{X=await loadXLSX()}catch(e){ov('엑셀',`<p>엑셀 기능을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.</p>`);return}
  const d=xlsData(),wb=X.utils.book_new(),sh=(rows,name,w)=>{const ws=X.utils.aoa_to_sheet(rows);ws['!cols']=w.map(x=>({wch:x}));X.utils.book_append_sheet(wb,ws,name)};
- sh(d.mto,'자재 집계',[14,10,8,6,60]);sh(d.byl,'라인별 자재',[24,14,10,8,6,60]);sh(d.wl,'용접 대장',[10,22,10,8,10,10,12,8,8,8,14,10,10,10,8,16]);sh(d.gk,'가스켓·볼트',[8,22,8,8,40,9,16,10,10]);sh(d.pl,'부품 목록',[10,12,8,22,22,10,8,10,8,8,8,6,30]);
+ sh(d.mto,'자재 집계',[14,10,8,6,60]);sh(d.byl,'라인별 자재',[24,14,10,8,6,60]);sh(d.wl,'용접 대장',[10,22,10,8,10,10,12,8,8,8,14,10,10,10,8,16]);sh(d.gk,'가스켓·볼트',[8,22,8,8,40,9,16,10,10]);sh(d.pl,'부품 목록',[10,12,8,22,22,10,8,10,8,8,8,6,30]);sh(d.sp,'스풀',[22,22,6,8,14,8,10,10]);
  const j=jobs.find(x=>x.id===cur),fn=(j?j.name:'PLANT3D').replace(/[\\/:*?"<>|]/g,'_')+'_자재·용접_'+new Date().toISOString().slice(0,10)+'.xlsx';const bl=new Blob([X.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});dlFile(fn,bl);lg('엑셀 내보내기: '+fn+' (용접 '+d.W.length+'개소)');$('hint').textContent='엑셀 파일을 저장했습니다: '+fn}
+/* ===== 자재 사양 (라인 클래스) — 한 번 등록하면 라인에 적용해 자재표·ISO·PCF가 그 사양으로 ===== */
+const CLK='p3d_cls',CLF=[['code','클래스',70],['rt','등급(#)',60],['face','면',58],['ps','배관 재질·스케줄',170],['fs','피팅',150],['fls','플랜지',90],['sch','스케줄',60],['vs','밸브 몸체',90],['gk','가스켓',170],['bs','볼트·너트',170]];
+function clsLoad(){try{const v=JSON.parse(localStorage.getItem(CLK)||'null');if(Array.isArray(v))return v}catch(e){}return[
+ {code:'A1A',rt:150,face:'RF',ps:'A106-B SMLS SCH40',fs:'A234-WPB SCH40',fls:'A105',sch:'SCH40',vs:'A216-WCB',gk:'SPIRAL WOUND 316SS GRAPHITE IR-316SS & OR-CS',bs:'STUD-BOLT A193 GR B7 W/A194 GR 2H NUTS',ex:1},
+ {code:'B1A',rt:300,face:'RF',ps:'A106-B SMLS SCH80',fs:'A234-WPB SCH80',fls:'A105',sch:'SCH80',vs:'A216-WCB',gk:'SPIRAL WOUND 316SS GRAPHITE IR-316SS & OR-CS',bs:'STUD-BOLT A193 GR B7 W/A194 GR 2H NUTS',ex:1}]}
+function clsSave(L){try{localStorage.setItem(CLK,JSON.stringify(L))}catch(e){}}
+const lnTokens=ln=>String(ln||'').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+function clsGuess(ln,L){const tk=lnTokens(ln);return(L||clsLoad()).find(c=>c.code&&tk.includes(String(c.code).toUpperCase()))||null}
+function clsApply(c,set,key){const rt=+c.rt||150;set.forEach(o=>{if(o.ex)return;
+  if(o.type==='pipe')o.spec=c.ps;else if(['elbow','tee','reducer','cap','coupling'].includes(o.type))o.spec=c.fs;
+  else if(o.type==='flange'){o.spec=c.fls;o.cls=rt;if(c.face)o.face=c.face}else if(o.type==='valve'){o.spec=c.vs;o.cls=rt}else if(['strainer','trap','psv'].includes(o.type))o.cls=rt;rb(o)});
+ dm[key]=Object.assign(dm[key]||{},{ps:c.ps,fs:c.fs,fls:c.fls,sch:c.sch,vs:c.vs,bs:c.bs,lcls:c.code});
+ const ids=new Set(set.map(o=>o.id));joints().filter(j=>ids.has(j.a.id)||ids.has(j.b.id)).forEach(j=>{const d=jd[j.id]=Object.assign({},jd[j.id]||{});if(c.gk)d.mt=c.gk;if(c.bs)d.bt=c.bs})}
+function clsUI(){const L=clsLoad(),LS=allLines();
+ const row=(c,i)=>`<tr>${CLF.map(([k,,w])=>k==='face'?`<td><select data-ck='${i}:${k}'>${['RF','FF','RTJ'].map(v=>`<option${(c.face||'RF')===v?' selected':''}>${v}</option>`).join('')}</select></td>`:`<td><input data-ck='${i}:${k}' value='${EH(c[k]??'')}' style='width:${w}px'${k==='rt'?" type='number'":''}></td>`).join('')}<td><button data-cdel='${i}' title='삭제'>✕</button></td></tr>`;
+ ov('📋 자재 사양 — 라인 클래스',`<p class='mut'>회사 배관 사양(라인 클래스)을 한 번 등록해 두면, 라인에 적용할 때 배관·피팅·플랜지·밸브 재질과 등급, 가스켓·볼트가 자재표·ISO·PCF에 그대로 들어갑니다. 이 기기에 저장되며 모든 작업에서 씁니다.${L.some(c=>c.ex)?' <b>예시 두 줄(A1A·B1A)은 회사 사양으로 고쳐 쓰세요.</b>':''}</p>
+<div class='wzrev' style='max-height:none;overflow:auto'><table class='clst'><thead><tr>${CLF.map(([,h])=>`<th>${h}</th>`).join('')}<th></th></tr></thead><tbody>${L.map(row).join('')}</tbody></table></div>
+<div class='row' style='margin:8px 0 18px'><button id='cadd'>+ 클래스 추가</button></div>
+<h3 style='font-size:15px;margin:6px 0'>라인에 적용</h3><p class='mut'>라인 번호 안에 클래스 코드가 들어 있으면(예: 3/4"-P-91009-<b>A1A</b>) 자동으로 골라 둡니다.</p>
+<div class='wzrev' style='max-width:760px'><table><thead><tr><th>라인 번호</th><th>부품</th><th>지금</th><th>적용할 클래스</th><th></th></tr></thead><tbody>${LS.map((l,i)=>{const key=l.ln.startsWith('(라인번호')?'_':l.ln,curc=(dm[key]||{}).lcls||'',g=clsGuess(l.ln,L);return`<tr><td>${EH(l.ln)}</td><td>${l.set.length}</td><td>${curc?EH(curc):'<span class=mut>-</span>'}</td><td><select data-lsel='${i}'><option value=''>(선택)</option>${L.map((c,k)=>`<option value='${k}'${(curc?c.code===curc:g===c)?' selected':''}>${EH(c.code)} · ${c.rt}#</option>`).join('')}</select></td><td><button data-lapp='${i}' class='pri'>적용</button></td></tr>`}).join('')||`<tr><td colspan=5 class=mut>배관이 없습니다</td></tr>`}</tbody></table></div>
+${LS.length>1?`<div class='row' style='margin-top:8px'><button id='lappall'>선택한 클래스를 모든 라인에 적용</button></div>`:''}`,true);
+ const B=$('isob');
+ B.querySelectorAll('[data-ck]').forEach(el=>el.onchange=()=>{const [i,k]=el.dataset.ck.split(':'),L2=clsLoad();L2[+i][k]=k==='rt'?+el.value:el.value.trim();delete L2[+i].ex;clsSave(L2)});
+ B.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{const L2=clsLoad();L2.splice(+b.dataset.cdel,1);clsSave(L2);clsUI()});
+ $('cadd').onclick=()=>{const L2=clsLoad();L2.push({code:'NEW'+(L2.length+1),rt:150,face:'RF',ps:'',fs:'',fls:'',sch:'',vs:'',gk:'',bs:''});clsSave(L2);clsUI()};
+ const app=i=>{const sel=B.querySelector(`[data-lsel='${i}']`),c=clsLoad()[+sel.value];if(!c)return false;const l=LS[i],key=l.ln.startsWith('(라인번호')?'_':l.ln;clsApply(c,l.set,key);return true};
+ B.querySelectorAll('[data-lapp]').forEach(b=>b.onclick=()=>{if(app(+b.dataset.lapp)){save();lg('라인 클래스 적용: '+LS[+b.dataset.lapp].ln);clsUI()}});
+ if($('lappall'))$('lappall').onclick=()=>{let n=0;LS.forEach((l,i)=>{if(app(i))n++});save();lg('라인 클래스 적용: '+n+'개 라인');clsUI()}}
+function clsAuto(ids){const set=ids.map(get).filter(Boolean);if(!set.length)return null;const ln=(set.find(o=>o.ln)||{}).ln;const c=clsGuess(ln);if(!c)return null;clsApply(c,line(set[0]).filter(o=>LIN.includes(o.type)),ln||'_');save();return c.code}
+/* ===== 내보내기: DXF (ISO 도면 · 3D 중심선) · PCF ===== */
+const dxfT=t=>String(t).replace(/[^\x20-\x7e]/g,c=>'\\U+'+c.codePointAt(0).toString(16).toUpperCase().padStart(4,'0'));
+const dxfLay=t=>String(t||'0').replace(/[^A-Za-z0-9_\-]/g,'_').slice(0,60)||'0';
+function dxfDoc(E){return['0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','9','$INSUNITS','70','4','0','ENDSEC','0','SECTION','2','ENTITIES'].concat(E,['0','ENDSEC','0','EOF']).join('\r\n')+'\r\n'}
+const n3=v=>(Math.round(v*1000)/1000).toString();
+function dL(E,L,a,b){E.push('0','LINE','8',L,'10',n3(a[0]),'20',n3(a[1]),'30',n3(a[2]||0),'11',n3(b[0]),'21',n3(b[1]),'31',n3(b[2]||0))}
+/* ISO 도면(SVG) → DXF: A3(420×297 mm) 크기, 장마다 옆으로 */
+function svgToDxf(svgs){const E=[],k=420/1190;svgs.forEach((src,pi)=>{const doc=new DOMParser().parseFromString(src,'image/svg+xml'),sv=doc.documentElement,ox=pi*450,P=(x,y)=>[ox+x*k,(842-y)*k];
+  const num=(el,a)=>+(el.getAttribute(a)||0),lay=el=>el.getAttribute('stroke-dasharray')?'DASH':'ISO';
+  sv.querySelectorAll('line').forEach(el=>dL(E,lay(el),P(num(el,'x1'),num(el,'y1')),P(num(el,'x2'),num(el,'y2'))));
+  sv.querySelectorAll('rect').forEach(el=>{const x=num(el,'x'),y=num(el,'y'),w=num(el,'width'),h=num(el,'height');if(!w||!h||el.getAttribute('fill-opacity')==='0')return;const c=[P(x,y),P(x+w,y),P(x+w,y+h),P(x,y+h)];for(let i=0;i<4;i++)dL(E,'ISO',c[i],c[(i+1)%4])});
+  sv.querySelectorAll('circle').forEach(el=>{const c=P(num(el,'cx'),num(el,'cy'));E.push('0','CIRCLE','8','ISO','10',n3(c[0]),'20',n3(c[1]),'30','0','40',n3(num(el,'r')*k))});
+  sv.querySelectorAll('ellipse').forEach(el=>{const cx=num(el,'cx'),cy=num(el,'cy'),rx=num(el,'rx'),ry=num(el,'ry');let pv=null;for(let i=0;i<=36;i++){const t=i/36*Math.PI*2,q=P(cx+rx*Math.cos(t),cy+ry*Math.sin(t));if(pv)dL(E,'ISO',pv,q);pv=q}});
+  sv.querySelectorAll('path,polyline,polygon').forEach(el=>{let d=el.getAttribute('d');if(!d){const pts=(el.getAttribute('points')||'').trim();if(!pts)return;d='M'+pts+(el.tagName==='polygon'?'Z':'')}
+   const tk=d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g)||[];let i=0,cmd='',cx=0,cy=0,sx=0,sy=0;const nx=()=>+tk[i++];const seg=(x,y)=>{dL(E,lay(el),P(cx,cy),P(x,y));cx=x;cy=y};
+   while(i<tk.length){if(/[a-zA-Z]/.test(tk[i]))cmd=tk[i++];const rel=cmd===cmd.toLowerCase(),C=cmd.toUpperCase();
+    if(C==='M'){const x=nx(),y=nx();cx=rel?cx+x:x;cy=rel?cy+y:y;sx=cx;sy=cy;cmd=rel?'l':'L'}else if(C==='L'){const x=nx(),y=nx();seg(rel?cx+x:x,rel?cy+y:y)}else if(C==='H'){const x=nx();seg(rel?cx+x:x,cy)}else if(C==='V'){const y=nx();seg(cx,rel?cy+y:y)}
+    else if(C==='Z'){seg(sx,sy)}else if(C==='C'){nx();nx();nx();nx();const x=nx(),y=nx();seg(rel?cx+x:x,rel?cy+y:y)}else if(C==='Q'||C==='S'){nx();nx();const x=nx(),y=nx();seg(rel?cx+x:x,rel?cy+y:y)}else if(C==='A'){nx();nx();nx();nx();nx();const x=nx(),y=nx();seg(rel?cx+x:x,rel?cy+y:y)}else i++}});
+  sv.querySelectorAll('text').forEach(el=>{const t=el.textContent;if(!t||!t.trim())return;const x=num(el,'x'),y=num(el,'y'),fz=num(el,'font-size')||8,an=el.getAttribute('text-anchor')||'start',tf2=el.getAttribute('transform')||'',m=tf2.match(/rotate\((-?[\d.]+)/),rot=m?-(+m[1]):0,q=P(x,y),hj=an==='middle'?1:an==='end'?2:0;
+   E.push('0','TEXT','8','TEXT','10',n3(q[0]),'20',n3(q[1]),'30','0','40',n3(fz*k*.72),'1',dxfT(t.trim()),'50',n3(rot));if(hj)E.push('72',String(hj),'11',n3(q[0]),'21',n3(q[1]),'31','0')})});
+ return dxfDoc(E)}
+const toPCF=p=>[p[0],-p[2],p[1]],toDX=toPCF;
+function elbCorner(o){const g=eg(o),kk=g.R*Math.tan(g.th/2);return[o.pos[0]+g.a.x*kk,o.pos[1]+g.a.y*kk,o.pos[2]+g.a.z*kk]}
+function modelDxf(){const E=[];objs.forEach(o=>{if(!LIN.includes(o.type)&&o.type!=='support')return;const L=dxfLay(o.ln||(o.ex?'EXISTING':'NO_LINE')),ps=(()=>{try{return ports(o)}catch(e){return[]}})();if(!ps.length)return;
+  if(o.type==='elbow'){const c=elbCorner(o);ps.forEach(q=>dL(E,L,toDX(q.p),toDX(c)))}
+  else if(o.type==='tee'){const run=ps.filter(q=>q.n!=='분기'),br=ps.find(q=>q.n==='분기');if(run.length>1)dL(E,L,toDX(run[0].p),toDX(run[1].p));if(br&&run.length>1){const m=run[0].p.map((v,i)=>(v+run[1].p[i])/2);dL(E,L,toDX(m),toDX(br.p))}}
+  else if(ps.length>1)dL(E,L,toDX(ps[0].p),toDX(ps[1].p));else dL(E,L,toDX(o.pos),toDX(ps[0].p))});
+ objs.filter(o=>EQT.includes(o.type)).forEach(o=>{const c=toDX(o.pos);E.push('0','CIRCLE','8','EQUIPMENT','10',n3(c[0]),'20',n3(c[1]),'30',n3(c[2]),'40','300','0','TEXT','8','EQUIPMENT','10',n3(c[0]),'20',n3(c[1]),'30',n3(c[2]+400),'40','150','1',dxfT(o.tag||''))});
+ return dxfDoc(E)}
+const PSK={gate:'VTFL',globe:'VGFL',ball:'VBFL',butterfly:'VYFL',check:'CKFL',wcheck:'CKWF',plug:'VPFL',ctrl:'CVFL'};
+function pcfOf(set,ln){const f=v=>v.toFixed(1),EP=q=>'    END-POINT '+toPCF(q.p).map(f).join(' ')+' '+(+q.nps||0),out=['ISOGEN-FILES ISOGEN.FLS','UNITS-BORE INCH','UNITS-CO-ORDS MM','UNITS-WEIGHT KGS','UNITS-BOLT-DIA INCH','UNITS-BOLT-LENGTH MM','PIPELINE-REFERENCE '+(ln||'LINE'),'    PROJECT-IDENTIFIER PLANT3D','    DATE-DMY '+new Date().toLocaleDateString('en-GB').replace(/\//g,'/'),''];
+ const sw=o=>isSB(o)||vSB(o),desc=o=>'    ITEM-DESCRIPTION '+((T[o.type]?T[o.type].n:o.type)+' '+nf(o.nps)+(o.spec?' '+o.spec:'')).replace(/[^\x20-\x7e가-힣]/g,'');
+ set.filter(o=>!o.ex).sort((a,b)=>a.id-b.id).forEach(o=>{let ps=[];try{ps=ports(o)}catch(e){}if(!ps.length)return;const C=[];
+  if(o.type==='pipe')C.push('PIPE',EP(ps[0]),EP(ps[1]));
+  else if(o.type==='elbow')C.push('ELBOW',EP(ps[0]),EP(ps[1]),'    CENTRE-POINT '+toPCF(elbCorner(o)).map(f).join(' '),'    SKEY '+(sw(o)?'ELSW':'ELBW'),'    ANGLE '+(+o.ang||EK[o.kind||'lr90'][1]).toFixed(1));
+  else if(o.type==='tee'){const run=ps.filter(q=>q.n!=='분기'),br=ps.find(q=>q.n==='분기'),m=run[0].p.map((v,i)=>(v+run[1].p[i])/2);C.push('TEE',EP(run[0]),EP(run[1]),'    CENTRE-POINT '+toPCF(m).map(f).join(' '),'    BRANCH1-POINT '+toPCF(br.p).map(f).join(' ')+' '+(+br.nps||0),'    SKEY '+(sw(o)?'TESW':'TEBW'))}
+  else if(o.type==='reducer')C.push(o.rt==='ecc'?'REDUCER-ECCENTRIC':'REDUCER-CONCENTRIC',EP(ps[0]),EP(ps[1]),'    SKEY '+(o.rt==='ecc'?'REBW':'RCBW'));
+  else if(o.type==='flange')C.push(o.kind==='bl'?'FLANGE-BLIND':'FLANGE',EP(ps[0]),EP(ps[1]||ps[0]),'    SKEY '+({wn:'FLWN',so:'FLSO',sw:'FLSW',th:'FLSC',lj:'FLLJ',bl:'FLBL'}[o.kind||'wn']||'FLWN'));
+  else if(o.type==='valve')C.push('VALVE',EP(ps[0]),EP(ps[1]),'    SKEY '+(PSK[o.vt]||'VVFL'));
+  else if(o.type==='coupling')C.push('COUPLING',EP(ps[0]),EP(ps[1]),'    SKEY CPSW');
+  else if(o.type==='cap')C.push('CAP',EP(ps[0]),'    SKEY CPBW');
+  else if(o.type==='inst')C.push('INSTRUMENT',EP(ps[0]),EP(ps[1]||ps[0]),'    SKEY IDFL');
+  else if(o.type==='strainer')C.push('FILTER',EP(ps[0]),EP(ps[1]||ps[0]),'    SKEY FIFL');
+  else C.push('MISC-COMPONENT',EP(ps[0]),EP(ps[1]||ps[0]),'    SKEY XXXX');
+  C.push(desc(o));out.push(...C,'')});
+ objs.filter(o=>o.type==='support'&&set.some(x=>x.id===o.host)).forEach(o=>out.push('SUPPORT','    CO-ORDS '+toPCF(o.pos).map(f).join(' ')+' 0','    SKEY 01HG',''));
+ return out.join('\r\n')}
+function expFn(x){const j=jobs.find(q=>q.id===cur);return((j?j.name:'PLANT3D')+'_'+x).replace(/[\\/:*?"<>|]/g,'_')}
+function exportMenu(kind){
+ if(kind==='isodxf'){const sh=isoSVGs();if(!sh.length){ov('DXF',`<p class='mut'>배관 부품이 없습니다.</p>`);return}dlFile(expFn('ISO_'+sh.length+'장.dxf'),new Blob([svgToDxf(sh)],{type:'application/dxf'}));lg('ISO DXF 내보내기 ('+sh.length+'장)');return}
+ if(kind==='3ddxf'){dlFile(expFn('3D중심선.dxf'),new Blob([modelDxf()],{type:'application/dxf'}));lg('3D 중심선 DXF 내보내기');return}
+ if(kind==='pcf'){const LS=allLines();if(!LS.length){ov('PCF',`<p class='mut'>배관이 없습니다.</p>`);return}
+  ov('PCF 내보내기 — 라인별 배관 데이터',`<p class='mut'>PCF는 Isogen·AutoCAD Plant 3D·응력 해석 프로그램 등이 읽는 배관 데이터 파일입니다. 좌표는 X=동(E) · Y=북(N) · Z=높이(EL), mm. 가스켓·볼트는 넣지 않습니다(각 프로그램이 사양으로 붙임).</p><div class='wzrev' style='max-width:720px'><table><thead><tr><th>라인 번호</th><th>부품</th><th></th></tr></thead><tbody>${LS.map((l,i)=>`<tr><td>${EH(l.ln)}</td><td>${l.set.length}개</td><td><button data-pcf='${i}'>PCF 받기</button></td></tr>`).join('')}</tbody></table></div>`,true);
+  $('isob').querySelectorAll('[data-pcf]').forEach(b=>b.onclick=()=>{const l=LS[+b.dataset.pcf];dlFile(expFn(dxfLay(l.ln)+'.pcf'),new Blob([pcfOf(l.set,l.ln)],{type:'text/plain'}));lg('PCF 내보내기: '+l.ln)});return}}
 /* ===== 3차: 평면도·입면도 ===== */
 let ORV='plan';
 function orthoSvg(view){const PRJ={plan:p=>[p[0],p[2]],front:p=>[p[0],-p[1]],side:p=>[-p[2],-p[1]]}[view],items=[];
@@ -748,7 +856,8 @@ function lg(t){log.unshift(new Date().toLocaleString('ko-KR',{month:'numeric',da
 function rl(){jUI();$('log').innerHTML=log.slice(0,40).map(s=>'<div>'+s.replace(/</g,'&lt;')+'</div>').join('')||'아직 기록이 없습니다.'}
 /* 파일 내려받기: claude.ai 미리보기 안에서는 다운로드 기능(허락 창)으로, 그 밖(앱·사이트)에서는 보통 다운로드로 */
 let DLC=null;try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('downloads').then(d=>{DLC=d}).catch(()=>{})}catch(e){}
-function dlFile(name,blob){if(DLC){DLC.save({filename:name,data:blob}).then(()=>{$('hint').textContent='「'+name+'」 저장했습니다.'}).catch(e=>{$('hint').textContent=e&&e.code==='declined'?'저장을 취소했습니다.':'이 화면에서는 파일 저장이 안 됩니다 ('+(e&&e.code||'')+'). kimcm86.github.io/plant3d 에서 열어 주세요.'});return}
+function dlFile(name,blob){if(DLC&&!/\.(gif|png|jpe?g|webp|mp4|webm|mov|txt|json|md|docx|pptx|epub|csv|ttf|html|svg|pdf|xlsx|zip|fig)$/i.test(name)){name+='.txt';setTimeout(()=>{$('hint').textContent='이 화면에서는 「.txt」가 붙어 저장됩니다 — 파일 이름 끝의 .txt를 지우면 CAD에서 열립니다.'},1500)}
+ if(DLC){DLC.save({filename:name,data:blob}).then(()=>{$('hint').textContent='「'+name+'」 저장했습니다.'}).catch(e=>{$('hint').textContent=e&&e.code==='declined'?'저장을 취소했습니다.':'이 화면에서는 파일 저장이 안 됩니다 ('+(e&&e.code||'')+'). kimcm86.github.io/plant3d 에서 열어 주세요.'});return}
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
 function hint(){$('hint').textContent=objs.length?'드래그: 돌려 보기 · 휠: 가리킨 곳 확대 · 부품 클릭: 선택 (A: 연결된 것 모두) · 자세한 조작법은 위 오른쪽 "? 조작법"':'왼쪽 목록에서 부품을 눌러 추가하세요. 배관·밸브를 선택한 상태에서 추가하면 그 끝에 이어 붙습니다.'}
 
@@ -885,10 +994,13 @@ $('bat').onclick=attOpen;
 document.querySelectorAll('header .menu').forEach(m=>{m.querySelector('.mb').onclick=e=>{e.stopPropagation();const o=m.classList.contains('open');document.querySelectorAll('header .menu.open').forEach(x=>x.classList.remove('open'));if(!o)m.classList.add('open')};m.querySelector('.mp').addEventListener('click',()=>m.classList.remove('open'))});
 document.addEventListener('click',e=>{if(!e.target.closest('header .menu'))document.querySelectorAll('header .menu.open').forEach(x=>x.classList.remove('open'));if(!e.target.closest('#helpp,#bhelp'))$('helpp').hidden=true});
 $('bhelp').onclick=()=>{$('helpp').hidden=!$('helpp').hidden};
+$('bdxf').onclick=()=>exportMenu('isodxf');$('bdxf3').onclick=()=>exportMenu('3ddxf');$('bpcf').onclick=()=>exportMenu('pcf');
+$('bcls').onclick=clsUI;
+$('bspool').onclick=()=>{isoSpool=true;isoCut=false;isoPg=0;$('biso').onclick()};
 $('biso').onclick=()=>{const o=get(sid)||(ml.length?get(ml[0]):null)||objs.find(x=>LIN.includes(x.type));if(!o){$('hint').textContent='배관이 없습니다. 먼저 배관을 그리거나 ISO 도면을 3D로 바꾸세요.';return}sid=o.id;iso('line')};
 $('bxyz').onclick=()=>{xyzOpen=true;if(!sid&&ml.length<2){$('hint').textContent='📍 좌표에 놓을 부품(배관·밸브·장치 등)을 먼저 클릭하세요. 그러면 오른쪽 속성 아래에 좌표 입력칸이 열립니다.';hl&&0;return}rp();const d=document.querySelector('#props .xyz');if(d){d.open=true;d.scrollIntoView({block:'nearest'})}};
 window.P3D={_rb:o=>rb(o),_scr:id=>{const g=gm[id];if(!g)return null;const c=new THREE.Box3().setFromObject(g).getCenter(V(0,0,0)).project(cam),b=cv.getBoundingClientRect();return[b.left+(c.x+1)/2*b.width,b.top+(1-c.y)/2*b.height]},_scrP:q=>{const c=V(q[0]*S,q[1]*S,q[2]*S).project(cam),b=cv.getBoundingClientRect();return[b.left+(c.x+1)/2*b.width,b.top+(1-c.y)/2*b.height]},_ports:id=>{const o=objs.find(x=>x.id===id);return o?ports(o).map(q=>({n:q.n,p:q.p})):[]},_sel:()=>({sid,ml:ml.slice()}),DEF,T,DIR,VT,IK,SZ,eg,HGx,dflen,keyOf,ports,loadModel,ov,attOpen,fAll,fPut,pdfLib,drawFile,EH,lg,save,
- getObjs:()=>objs,
+ getObjs:()=>objs,clsAuto:ids=>clsAuto(ids),
  _cam:()=>({dist,tg:tg.toArray(),near:camP.near,pos:cam.position.toArray()}),
  bom:ids=>{const set=objs.filter(o=>ids.includes(o.id)&&LIN.includes(o.type));const js=joints().filter(j=>ids.includes(j.a.id)||ids.includes(j.b.id));return bomItems(set,Object.assign({},DM0),js,ids)},
  removeWhere:pr=>{const rm=objs.filter(pr);rm.forEach(o=>{const g=gm[o.id];if(g){sc.remove(g);g.traverse(c=>{if(c.geometry)c.geometry.dispose()})}delete gm[o.id]});objs=objs.filter(o=>!pr(o));sid=null;ml=[];rgk();hl();rp();save();return rm.length},
@@ -897,7 +1009,9 @@ window.P3D={_rb:o=>rb(o),_scr:id=>{const g=gm[id];if(!g)return null;const c=new 
 $('isob').addEventListener('change',async e=>{if(e.target.id!=='attin')return;const t=Date.now();let i=0;for(const f of e.target.files){await fPut({id:'f'+t+'_'+(i++),job:cur,name:f.name,type:f.type||(/\.pdf$/i.test(f.name)?'application/pdf':''),size:f.size,blob:f,added:t+i})}attOpen()});
 $('isob').addEventListener('click',async e=>{const b=e.target.closest('[data-att]');if(!b)return;const a=b.dataset.att,c=b.closest('.attc');if(a==='del'&&c&&confirm('이 첨부 파일을 삭제할까요?')){await fDel(c.dataset.fid);attOpen()}else if(a==='view')attBig(c.dataset.fid);else if(a==='dl'){const f=(await fAll()).find(x=>x.id===c.dataset.fid);if(f&&f.blob)dlFile(f.name||'drawing.pdf',f.blob)}else if(a==='back')attOpen();else if(window.P3DX){if(a==='wiz')P3DX.wizard(c.dataset.fid);else if(a==='ai')P3DX.convert(c.dataset.fid);else if(a==='table')P3DX.table(c.dataset.fid);else if(a==='aicfg')P3DX.settings();else if(a==='manual')P3DX.manual()}});
 $('isoc').onclick=()=>{$('iso').hidden=true;$('iso3').hidden=false;$('isop').hidden=false};$('iso3').onclick=()=>{$('iso').hidden=true;const ids=isoIds.filter(i=>gm[i]);if(!ids.length)return;ml=ids.slice();sid=null;sj=null;hl();rp();const bx=new THREE.Box3();ids.forEach(i=>{gm[i].updateMatrixWorld(true);bx.expandByObject(gm[i])});const c=bx.getCenter(new THREE.Vector3()),z=bx.getSize(new THREE.Vector3());tg.copy(c);dist=Math.max(.4,z.length()*1.6);yaw=.8;pit=.5};$('isop').onclick=()=>{try{window.print()}catch(e){}};$('isoall').onclick=isoAllPDF;$('bchk').onclick=checkUI;$('bxls').onclick=xlsExport;$('bortho').onclick=()=>orthoUI();$('isob').addEventListener('click',e=>{const b=e.target.closest('[data-orv]');if(b)orthoUI(b.dataset.orv)});$('undo').onclick=undo;$('redo').onclick=redo;$('vbar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v)viewTo(b.dataset.v);else if(b.id==='vort')setOrtho(cam!==camO);else if(b.id==='vcol'){COLM=COLM==='real'?'status':'real';try{localStorage.setItem('p3d_col',COLM)}catch(e){}b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real');objs.forEach(rb);hl()}});{const b=$('vcol');b.textContent=COLM==='real'?'실물색':'상태색';b.classList.toggle('on',COLM==='real')}$('bclash').onclick=clashUI;$('isob').addEventListener('click',e=>{const tr=e.target.closest('[data-cl]');if(tr)window.P3D.focus(tr.dataset.cl.split(',').map(Number))});$('bj').onclick=jlist;
-$('isob').addEventListener('click',e=>{const g=e.target.closest('[data-cut],[data-ispg],[data-isocut],[data-isocut0]');if(!g||!$('isob').querySelector('.isosh'))return;const d=g.dataset;
+$('isob').addEventListener('click',e=>{const g=e.target.closest('[data-cut],[data-ispg],[data-isocut],[data-isocut0],[data-isospool],[data-fw]');if(!g||!$('isob').querySelector('.isosh'))return;const d=g.dataset;
+ if(g.hasAttribute('data-isospool')){isoSpool=!isoSpool;isoCut=false;isoPg=0;iso(lastIso);return}
+ if(d.fw){dm[curKey]=dm[curKey]||{};const f=(dm[curKey].fw||[]).slice(),i=f.indexOf(d.fw);if(i>=0)f.splice(i,1);else f.push(d.fw);dm[curKey].fw=f;save();iso(lastIso);return}
  if(d.cut){dm[curKey]=dm[curKey]||{};const c=(dm[curKey].cuts||[]).slice(),i=c.indexOf(d.cut);if(i>=0)c.splice(i,1);else c.push(d.cut);dm[curKey].cuts=c;save();iso(lastIso)}
  else if(d.ispg){isoPg+=+d.ispg;iso(lastIso)}else if(g.hasAttribute('data-isocut0')){if(dm[curKey])dm[curKey].cuts=[];isoPg=0;save();iso(lastIso)}else if(g.hasAttribute('data-isocut')){isoCut=!isoCut;iso(lastIso)}});
 $('isob').addEventListener('change',e=>{const d=e.target.dataset;if(d.d){dm[curKey]=Object.assign(dm[curKey]||{},{[d.d]:e.target.value});save();iso(lastIso)}else if(d.j)jset(d.j,d.jk,e.target.value)});$('isob').addEventListener('click',e=>{if(e.target.tagName==='SUMMARY')dOpen=!e.target.parentElement.open});

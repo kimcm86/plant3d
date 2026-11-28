@@ -1166,7 +1166,7 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
   function wJoinUI() {
     const el = $('wzjoin'); if (!el) return;
     const tt = W.title || {}, sh = W.f.sheet || {};
-    let h = '';
+    let h = W.clsCode ? `<p>📋 라인 번호에서 클래스 <b>${E(W.clsCode)}</b>를 찾아 자재 사양(재질·등급·가스켓·볼트)을 적용했습니다.</p>` : '';
     const info = (sh.ln ? '라인 <b>' + E(sh.ln) + '</b>' : '라인 번호 없음') + (sh.sht ? ' · ' + sh.sht + '/' + (sh.of || '?') + '장' : '');
     if (W.placed && W.placed.kind === 'join') h += `<p>🔗 ${info} — <b>${E(W.placed.lab)}</b>에 이 장의 ${E(W.placed.e)} 쪽을 맞춰 이어 붙였습니다.</p>`;
     else if (W.placed && W.placed.kind === 'xyz') h += `<p>📍 ${info} — ${E(W.placed.lab)} 를 실제 좌표 E ${W.placed.E} · N ${W.placed.N} · EL ${W.placed.EL} 에 놓았습니다.</p>`;
@@ -1315,6 +1315,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 <div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button><span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
     W.built = ids; W.atBuild = true;
+    try { W.clsCode = P.clsAuto ? P.clsAuto(ids) : null; } catch (e) { W.clsCode = null; }
     wJoinUI();
     const bx = $('wzbom'); if (bx) { bx.innerHTML = wBomSec(); bx.onchange = e => { const t = e.target.closest('[data-bq]'); if (!t) return; const [i, k] = t.dataset.bq.split(':'), row = W.bom.rows[+i]; const v = t.value; row[k] = k === 'cat' ? v : (v === '' ? null : +v); const op = bx.querySelector('details').open; bx.innerHTML = wBomSec(); if (op) bx.querySelector('details').open = true; }; }
     if (W.ocrRun) { const w0 = W, t = setInterval(() => { if (W !== w0 || !$('wzbom')) return clearInterval(t); if (!w0.ocrRun) { clearInterval(t); $('wzbom').innerHTML = wBomSec(); } }, 1000); }
