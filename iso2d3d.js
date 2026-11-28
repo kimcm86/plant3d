@@ -870,6 +870,7 @@ RULES
     if (mini) { const mg = mini.getContext('2d'), ms = mini.width / W.big.width; mini.height = Math.round(W.big.height * ms); mg.drawImage(W.big, 0, 0, mini.width, mini.height); mg.strokeStyle = '#dc2626'; mg.lineWidth = 2; mg.strokeRect(x0 * ms, y0 * ms, w * ms, h * ms); }
   }
   function wRender() {
+    if (W.fixAt != null && W.hist.length > W.fixAt && W.q.phase !== 'done') { W.q = { ri: 0, si: 0, phase: 'done' }; W.fixAt = null; }
     const R = W.R, q = W.q, r = R.runs[q.ri], s = r && r.steps[q.si];
     const done0 = W.hist.length, total = done0 + wRemain(), idx = Math.min(total, done0 + 1);
     const btn = (v, l, cls) => `<button data-wz="${E(String(v))}"${cls ? ` class="${cls}"` : ''}>${l}</button>`;
@@ -961,7 +962,7 @@ RULES
  <div class="wzhd"><div class="wzbar"><i style="width:${q.phase === 'done' ? 100 : pct}%"></i></div><span class="mut">${q.phase === 'done' ? '완료' : idx + ' / ' + total}</span></div>
  <div class="wzmain"><canvas id="wzcv" width="1100" height="560"></canvas><canvas id="wzmini" width="220" height="150"></canvas></div>
  <h3 class="wzq" id="wzq0">${title}</h3>${W.ocrRun ? `<p class="wzocrb">⏳ <span id="wzocr">${E(W.ocrMsg || '도면 치수 읽는 중…')}</span> — 다 읽으면 길이가 자동으로 채워집니다.</p>` : ''}${body}
- <div class="row wzft"><button data-wz="back"${W.hist.length ? '' : ' disabled'}>← 이전</button><span style="flex:1"></span><button data-att="back">그만두기</button><button data-wz="adv" class="ghost">고급 편집</button></div>
+ <div class="row wzft"><button data-wz="back"${W.hist.length ? '' : ' disabled'}>← 이전</button><span style="flex:1"></span>${B && !B.run && W.batchI != null ? '<button data-bt="res">← 일괄 변환 결과</button>' : '<button data-att="back">그만두기</button>'}<button data-wz="adv" class="ghost">고급 편집</button></div>
  <div id="wzmsg" class="mut"></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
     const marks = q.phase === 'size' ? (R.cands || []).filter(c => dist2(c, R.runs[0]._p0) > 1) : null;
@@ -1112,7 +1113,7 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
     }
     wSnap();
     const [k, v] = a.split(':');
-    if ((k === 'type' || k === 'end') && s) symLearn(q.ri, q.si, k, v);
+    if ((k === 'type' || k === 'end') && s && !W.auto) symLearn(q.ri, q.si, k, v);
     if (k === 'roll') {
       const r0 = W.R.runs[q.ri], nx = r0.steps[q.si + 1];
       s.roll.pl = v; s.okRoll = true; s.rollPick = v;
@@ -1312,13 +1313,14 @@ ${W.bom ? '<p class="mut">도면 BOM과의 자세한 비교는 결과 화면의 
 ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 있습니다 (예: 앞 부품과 길이가 겹침). 3D를 보고 이상하면 "이전 단계로" 돌아가 길이를 고치거나, 고급 편집에서 확인하세요.</p>` : ''}
 <div class="wzb"><button data-wz="see3d" class="pri big">3D로 보기</button><button data-wz="seeiso" class="big">원본 ↔ 다시 만든 ISO 나란히</button></div>
 <div id="wzjoin"></div><div id="wzbom"></div>
-<div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button><span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
+<div class="row wzft"><button data-wz="again">← 이전 단계로 (답 고치기)</button>${B && !B.run && W.batchI != null ? '<button data-bt="res">← 일괄 변환 결과</button>' : ''}<span style="flex:1"></span><button data-wz="adv" class="ghost">고급 편집</button></div></div>`);
     $('iso3').hidden = true; $('isop').hidden = true;
     W.built = ids; W.atBuild = true;
     try { W.clsCode = P.clsAuto ? P.clsAuto(ids) : null; } catch (e) { W.clsCode = null; }
     wJoinUI();
+    if (!W.auto) accSave(W);
     const bx = $('wzbom'); if (bx) { bx.innerHTML = wBomSec(); bx.onchange = e => { const t = e.target.closest('[data-bq]'); if (!t) return; const [i, k] = t.dataset.bq.split(':'), row = W.bom.rows[+i]; const v = t.value; row[k] = k === 'cat' ? v : (v === '' ? null : +v); const op = bx.querySelector('details').open; bx.innerHTML = wBomSec(); if (op) bx.querySelector('details').open = true; }; }
-    if (W.ocrRun) { const w0 = W, t = setInterval(() => { if (W !== w0 || !$('wzbom')) return clearInterval(t); if (!w0.ocrRun) { clearInterval(t); $('wzbom').innerHTML = wBomSec(); } }, 1000); }
+    if (W.ocrRun) { const w0 = W, t = setInterval(() => { if (W !== w0 || !$('wzbom')) return clearInterval(t); if (!w0.ocrRun) { clearInterval(t); $('wzbom').innerHTML = wBomSec(); accSave(w0); } }, 1000); }
   }
   function wClick(e) {
     const b = e.target.closest('[data-wz]'); if (!b || !W) return;
@@ -1359,5 +1361,178 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
 @media(max-width:900px){.tbw{grid-template-columns:1fr}.tbimg{position:static}}`;
   document.head.appendChild(css);
 
-  window.P3DX = { _wz: () => W, wizard, convert, table, settings, manual, buildRoute, SYS, _aiRead: aiRead, _tiles: tiles };
+  /* ---------- 여러 장 일괄 변환 · 정확도 점검 ---------- */
+  let B = null;
+  const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
+  const natCmp = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
+  // 3D로 만든 결과를 도면 BOM과 비교한 숫자 (정확도)
+  function accOf(w) {
+    const st = { ocr: 0, fit: 0, user: 0, est: 0, n: 0 };
+    w.R.runs.forEach(r => r.steps.forEach(s => { const k = s.auto === 'ocr' || s.auto === 'ocr-ok' ? 'ocr' : s.auto === 'fit' ? 'fit' : s.est ? 'est' : 'user'; st[k]++; st.n++; }));
+    const a = { at: Date.now(), ln: (w.f.sheet && w.f.sheet.ln) || w.R.line_no || '', len: st, bom: null };
+    if (w.bom && w.built && w.built.length) {
+      try {
+        const list = bomCompare(w.bom, P.bom(w.built)), g = { ok: 0, diff: 0, extra: 0, q: 0 }, p = { ok: 0, n: 0 }, bad = [];
+        const allOk = re => list.filter(r => re.test(r.c)).every(r => r.st === 'ok');
+        const okc = { valve: allOk(/V\/V$|^VALVE$/), tee: allOk(/^TEE$/), red: allOk(/^REDUCER$/), end: allOk(/^(CAP|BLIND FLANGE)$/) };
+        list.forEach(r => {
+          if (r.c === 'GASKET' || r.c === 'STUD/BOLT') return; // 플랜지 수를 따라가므로 점수에서 뺌
+          if (r.c === 'PIPE') { if (r.st === 'q' || r.st === 'extra') return; p.n++; if (r.st === 'ok') p.ok++; else bad.push('배관 ' + nf(r.z) + ' ' + r.d + '→' + r.m + 'm'); return; }
+          const s2 = r.st === 'nip' ? 'ok' : r.st; g[s2] = (g[s2] || 0) + 1;
+          if (s2 === 'diff' || s2 === 'extra') bad.push((CATK[r.c] || r.c) + ' ' + (r.z ? nf(r.z) : '') + ' 도면 ' + r.d + ' / 3D ' + r.m);
+        });
+        const ec = { 90: 0, 45: 0, x: 0 }; w.R.runs.forEach(r => r.steps.forEach(x => { if (x.t !== 'elbow') return; const an = +x.eang || 90; if (Math.abs(an - 90) < 1) ec[90]++; else if (Math.abs(an - 45) < 1) ec[45]++; else ec.x++; }));
+        const be = { 90: 0, 45: 0 }; w.bom.rows.forEach(x => { if (x.cat === 'ELBOW') be[/45/.test((x.code || '') + ' ' + (x.desc || '')) ? 45 : 90] += +x.qty || 0; });
+        a.bom = { rows: w.bom.rows.length, ok: g.ok, diff: g.diff, extra: g.extra, q: g.q, pipe: p, elb: { m: ec, d: be }, bad: bad.slice(0, 12), okc };
+      } catch (e) { a.bom = null; }
+    }
+    return a;
+  }
+  const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
+  function accSave(w) { if (!w || !w.built || w.ocrRun) return; try { w.f.acc = accOf(w); P.fPut(w.f); } catch (e) { } }
+  // 자동으로 답하기: 화면의 추천 답(테두리 버튼)을 고르고, 근거가 약한 답은 '확인 필요'로 적어 둠
+  async function autoOne(it, say) {
+    W = null;
+    await wizard(it.id);
+    if (!W || W.fid !== it.id) { const m = document.querySelector('#wzhid .wz b'); return { st: 'fail', why: m ? m.textContent : '도면을 읽지 못했습니다' }; }
+    const w0 = W; w0.auto = true;
+    const t0 = Date.now();
+    while (w0.ocrRun && Date.now() - t0 < 300000) { say(w0.ocrMsg || '도면 읽는 중…'); await tick(400); if (B && B.stop) break; }
+    if (w0.title && w0.title.line_no && !w0.R.line_no) w0.R.line_no = w0.title.line_no;
+    const flags = [];
+    if (!w0.R.line_no) flags.push({ ri: 0, si: 0, ph: 'size', at: '표제란', why: '라인 번호를 못 읽음 — 같은 라인의 다른 장과 이어 붙이지 못합니다' });
+    say('질문에 자동으로 답하는 중…');
+    for (let n = 0; n < 600 && W === w0; n++) {
+      wRender();
+      const q = W.q; if (q.phase === 'done') break;
+      const r = W.R.runs[q.ri], s = r && r.steps[q.si], at = q.phase === 'size' ? '시작' : (q.ri + 1) + '-' + (q.si + 1);
+      const on = document.querySelector('#wzhid .wzb button.on'), dv = on && on.dataset.wz;
+      let a = dv, why = null;
+      if (q.phase === 'size') { if (!(W.title && W.title.nps)) why = '배관 크기를 표제란에서 못 읽음 — ' + nf(W.R.nps || 2) + '로 봄'; if (!a) a = 'size:' + (W.R.nps || 2); }
+      else if (q.phase === 'len') { const d = $('wzd'); if (d && d.value) { a = 'len'; if (s.ocr && (s.ocr.c < 60 || s.ocr.amb)) why = '길이 ' + s.ocr.v + ' — 읽은 확신 ' + s.ocr.c + '%' + (s.ocr.amb ? ', 근처에 다른 숫자' : ''); } else { a = 'len:skip'; why = '길이 치수를 못 읽음 — 어림값 ' + s.d + ' mm'; } }
+      else if (q.phase === 'slope') { a = 'slope:fig'; why = '경사 각도 치수 없음 — 그림 비율대로'; }
+      else if (q.phase === 'roll') { if (!s.roll.sure) why = '경사 면(수평/수직)을 빗금으로 확정 못 함'; }
+      else if (q.phase === 'type') { if (!a) { a = 'type:flange'; why = '표시 종류를 모름 — 플랜지로 봄'; } }
+      else if (q.phase === 'end') { if (!a) { a = 'end:open'; why = '배관 끝 처리를 모름 — 기존 배관 연결로 봄'; } }
+      else if (q.phase === 'rsize') why = '레듀서 크기 추정 — ' + (a ? a.split(':')[1] + '"' : '');
+      else if (q.phase === 'branch') why = '가지 배관 크기 — 본관과 같다고 봄';
+      if (!a) { flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why: '자동으로 답하지 못함' }); break; }
+      if (why) flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why });
+      const sig = JSON.stringify(W.q) + '|' + W.hist.length;
+      wAnswer(a);
+      if (JSON.stringify(W.q) + '|' + W.hist.length === sig) { flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why: '자동으로 넘기지 못함' }); break; }
+      if (n % 8 === 7) await tick();
+    }
+    if (W !== w0) return { st: 'fail', why: '중간에 멈췄습니다' };
+    if (W.q.phase !== 'done') { W.q = { ri: 0, si: 0, phase: 'done' }; }
+    say('3D 만드는 중…');
+    await wBuild();
+    w0.auto = false;
+    const sh = w0.f.sheet || {}, nObj = (w0.built || []).length;
+    const acc = accOf(w0); w0.f.acc = acc; await P.fPut(w0.f);
+    if (acc.bom && acc.bom.elb) { const e = acc.bom.elb; if (e.m[90] !== e.d[90] || e.m[45] !== e.d[45] || e.m.x) flags.push({ ri: 0, si: 0, ph: 'done', at: '엘보', why: '엘보 수가 도면 BOM과 다름 — 3D 90° ' + e.m[90] + '·45° ' + e.m[45] + ' / BOM 90° ' + e.d[90] + '·45° ' + e.d[45] }); }
+    const okc = acc.bom && acc.bom.okc; // 도면 BOM 수량이 맞는 품목은 추정 답도 맞는 것으로 봄
+    if (okc) { const drop = { type: okc.valve, branch: okc.tee, rsize: okc.red, end: okc.end }; for (let k = flags.length - 1; k >= 0; k--) if (drop[flags[k].ph]) flags.splice(k, 1); }
+    w0.big = null; // 메모리 아끼기 (다시 열 때 그림)
+    return { st: 'ok', W: w0, flags, n: nObj, ln: sh.ln || w0.R.line_no || '', sht: sh.sht, of: sh.of, placed: w0.placed, cls: w0.clsCode, acc };
+  }
+  async function batchPick() {
+    const fs = (await P.fAll()).filter(f => f.kind !== 'photo' && f.type === 'application/pdf' && (!f.job || f.job === P.curJob())).sort((a, b) => natCmp(a.name, b.name));
+    P.ov('여러 장 한 번에 3D로', `<div class="bt"><p class="bt-lead">고른 도면을 차례로 읽어 질문에 자동으로 답하고 3D로 만듭니다. 같은 라인 번호의 장은 끝끼리 이어 붙이고, 라인 클래스가 있으면 자재 사양도 넣습니다. 근거가 약한 답은 <b>확인 필요</b>로 모아 마지막에 보여 드립니다.</p>
+${fs.length ? `<table class="btt"><thead><tr><th style="width:36px"><input type="checkbox" id="btall" checked></th><th>도면</th><th>상태</th></tr></thead><tbody>${fs.map(f => `<tr><td><input type="checkbox" class="btck" value="${f.id}" checked></td><td>${E(f.name)}</td><td class="mut">${f.route ? '3D로 만든 적 있음 (다시 만듦)' : '처음'}</td></tr>`).join('')}</tbody></table>
+<div class="row bt-ft"><button data-att="back">← 첨부 목록</button><span style="flex:1"></span><button data-bt="go" class="pri">선택한 도면 3D로 만들기</button></div>` : '<p class="mut">PDF 도면이 없습니다. 먼저 첨부 목록에서 도면을 추가해 주세요.</p><div class="row bt-ft"><button data-att="back">← 첨부 목록</button></div>'}</div>`, true);
+    const al = $('btall'); if (al) al.onchange = () => document.querySelectorAll('.btck').forEach(c => { c.checked = al.checked; });
+  }
+  async function batchRun(ids) {
+    const all = await P.fAll();
+    B = { list: ids.map(id => { const f = all.find(x => x.id === id); return { id, name: f ? f.name : id, st: 'wait' }; }), stop: false, run: true, t0: Date.now() };
+    let hid = $('wzhid'); if (!hid) { hid = document.createElement('div'); hid.id = 'wzhid'; hid.setAttribute('aria-hidden', 'true'); document.body.appendChild(hid); }
+    const ov0 = P.ov; P.ov = (t, h) => { hid.innerHTML = h; };
+    const show = () => ov0('여러 장 한 번에 3D로', bHtml(), true);
+    show();
+    try {
+      for (const it of B.list) {
+        if (B.stop) { it.st = 'skip'; continue; }
+        it.st = 'run'; it.msg = '도면 읽는 중…'; show();
+        const say = m => { it.msg = m; const el = document.querySelector('[data-btmsg="' + it.id + '"]'); if (el) el.textContent = m; };
+        try { Object.assign(it, await autoOne(it, say)); } catch (e) { it.st = 'fail'; it.why = e.message; }
+        show();
+      }
+    } finally { P.ov = ov0; hid.innerHTML = ''; B.run = false; W = null; }
+    show();
+  }
+  // 같은 이유는 한 줄로 (예: 1-2 1-3 1-5 표시 종류를 모름)
+  function fGroup(fl) { const m = new Map(); fl.forEach((f, j) => { const k = f.why.replace(/\d+(\.\d+)?\s*mm|\d+%|— [^—]*\d[^—]*$/g, '#'); const g = m.get(k) || m.set(k, { why: f.why, js: [], n: 0 }).get(k); g.js.push(j); g.n++; if (g.n > 1) g.why = f.why.replace(/\s*[—-]\s*(어림값|읽은 확신)[^—]*$/, '') + (/(어림값)/.test(f.why) ? ' — 어림값 사용' : ''); }); return [...m.values()]; }
+  function bHtml() {
+    const L = B.list, done = L.filter(x => x.st === 'ok'), nf2 = L.reduce((a, x) => a + (x.flags ? x.flags.length : 0), 0), cur = L.findIndex(x => x.st === 'run');
+    const prog = Math.round(L.filter(x => !['wait', 'run'].includes(x.st)).length / L.length * 100);
+    const stc = x => x.st === 'ok' ? (x.flags.length ? `<span class="bdg warn">확인 ${x.flags.length}</span>` : '<span class="bdg ok">완료</span>') : x.st === 'run' ? '<span class="bdg run">진행 중</span>' : x.st === 'fail' ? '<span class="bdg bad">실패</span>' : x.st === 'skip' ? '<span class="bdg">건너뜀</span>' : '<span class="bdg">대기</span>';
+    const joinT = x => !x.placed ? '<span class="mut">—</span>' : x.placed.kind === 'join' ? '🔗 ' + E(x.placed.lab.replace(/\s*\(.*?\)\s*/, ' ')) : '📍 좌표';
+    const row = (x, i) => `<tr class="${x.st === 'run' ? 'on' : ''}"><td class="num">${i + 1}</td><td><div class="bt-n">${E(x.name)}</div>${x.st === 'run' ? `<div class="mut" data-btmsg="${x.id}">${E(x.msg || '')}</div>` : x.st === 'fail' ? `<div class="bt-err">${E(x.why || '')}</div>` : ''}</td>
+<td>${x.st === 'ok' ? E(x.ln || '—') + (x.sht ? ` <span class="mut">${x.sht}/${x.of || '?'}</span>` : '') : ''}</td><td class="num">${x.st === 'ok' ? x.n : ''}</td><td>${x.st === 'ok' ? joinT(x) : ''}</td><td>${x.st === 'ok' && x.cls ? E(x.cls) : ''}</td><td>${stc(x)}</td>
+<td class="nw">${x.st === 'ok' ? `<button data-bt="open:${i}" class="ghost">${x.flags.length ? '확인하기' : '열기'}</button>` : ''}</td></tr>${x.st === 'ok' && x.flags.length ? `<tr class="bt-fl"><td></td><td colspan="7"><ul>${fGroup(x.flags).map(g => `<li>${g.js.map(j => `<button class="lnk" data-bt="fix:${i}:${j}">${E(x.flags[j].at)}</button>`).join(' ')} ${E(g.why)}</li>`).join('')}</ul></td></tr>` : ''}`;
+    const head = B.run ? `<div class="bt-hd"><div class="wzbar"><i style="width:${prog}%"></i></div><span class="mut">${cur + 1} / ${L.length}</span><button data-bt="stop" class="ghost">${B.stop ? '멈추는 중…' : '멈추기'}</button></div>`
+      : `<div class="bt-sum"><div><b>${done.length}</b><span>3D 완료</span></div><div><b>${L.filter(x => x.st === 'fail').length}</b><span>실패</span></div><div class="${nf2 ? 'w' : ''}"><b>${nf2}</b><span>확인 필요</span></div><div><b>${done.reduce((a, x) => a + x.n, 0)}</b><span>부품</span></div><div><b>${done.filter(x => x.placed).length}</b><span>이어 붙임</span></div></div>`;
+    return `<div class="bt">${head}<table class="btt"><thead><tr><th>#</th><th>도면</th><th>라인 번호</th><th>부품</th><th>이음</th><th>클래스</th><th>상태</th><th></th></tr></thead><tbody>${L.map(row).join('')}</tbody></table>
+${B.run ? '<p class="mut">도면마다 치수·BOM 글자를 읽느라 한 장에 수십 초 걸립니다. 이 창을 닫지 마세요.</p>' : `<p class="mut">확인 필요 항목을 누르면 그 질문으로 바로 가고, 답하면 검토 화면으로 돌아옵니다. 검토 화면에서 "3D로 만들기"를 누르면 그 장만 다시 만듭니다.</p>
+<div class="row bt-ft"><button data-att="back">← 첨부 목록</button><span style="flex:1"></span><button data-bt="acc" class="ghost">📊 정확도 점검</button><button data-bt="see" class="pri">3D로 보기</button></div>`}</div>`;
+  }
+  async function bOpen(i, j) {
+    const it = B.list[i]; if (!it || !it.W) return;
+    W = it.W; W.batchI = i; W.fixJ = j;
+    if (!W.big) { W.big = document.createElement('canvas'); await P.drawFile(W.f, W.big, 3200); }
+    const f = j == null ? null : it.flags[j];
+    if (f && f.ph && !['done', 'size'].includes(f.ph) && W.R.runs[f.ri] && W.R.runs[f.ri].steps[f.si]) { W.q = { ri: f.ri, si: f.si, phase: f.ph }; W.fixAt = W.hist.length; }
+    else if (f && f.ph === 'size') { W.q = { ri: 0, si: 0, phase: 'size' }; W.fixAt = W.hist.length; }
+    else { W.q = { ri: 0, si: 0, phase: 'done' }; W.fixAt = null; }
+    wRender();
+  }
+  function bBack() { if (!B) return; const w = W; if (w && w.batchI != null) { const it = B.list[w.batchI]; if (it) { if (w.fixJ != null && it.flags[w.fixJ]) it.flags.splice(w.fixJ, 1); w.fixJ = null; it.acc = w.f.acc || it.acc; it.n = (w.built || []).length; it.placed = w.placed; } } P.ov('여러 장 한 번에 3D로', bHtml(), true); }
+  async function accReport() {
+    const fs = (await P.fAll()).filter(f => f.acc && (!f.job || f.job === P.curJob())).sort((a, b) => natCmp(a.name, b.name));
+    const T = { ok: 0, diff: 0, extra: 0, pk: 0, pn: 0, e: 0, en: 0, l: { ocr: 0, fit: 0, user: 0, est: 0, n: 0 } };
+    fs.forEach(f => { const a = f.acc; Object.keys(T.l).forEach(k => { T.l[k] += a.len[k] || 0; }); if (a.bom) { T.ok += a.bom.ok; T.diff += a.bom.diff; T.extra += a.bom.extra; T.pk += a.bom.pipe.ok; T.pn += a.bom.pipe.n; const e = a.bom.elb; T.en++; if (e.m[90] === e.d[90] && e.m[45] === e.d[45] && !e.m.x) T.e++; } });
+    const P1 = (a, b) => { const v = pct(a, b); return v == null ? '—' : v + '%'; };
+    const cmp = T.ok + T.diff + T.extra;
+    const rows = fs.map(f => { const a = f.acc, b = a.bom, l = a.len, c = b ? b.ok + b.diff + b.extra : 0;
+      return `<tr><td><div class="bt-n">${E(f.name)}</div><div class="mut">${E(a.ln || '')}</div></td><td class="num">${b ? P1(b.ok, c) : '<span class="mut">BOM 없음</span>'}</td><td class="num">${b ? (b.pipe.n ? b.pipe.ok + '/' + b.pipe.n : '—') : ''}</td><td class="num">${b ? (b.elb.m[90] === b.elb.d[90] && b.elb.m[45] === b.elb.d[45] && !b.elb.m.x ? '✓' : `<span class="bad">${b.elb.m[90]}·${b.elb.m[45]} / ${b.elb.d[90]}·${b.elb.d[45]}</span>`) : ''}</td><td class="num">${P1(l.ocr, l.n)}</td><td class="num">${P1(l.fit, l.n)}</td><td class="num">${l.est ? '<span class="bad">' + l.est + '</span>' : '0'}</td></tr>${b && b.bad.length ? `<tr class="bt-fl"><td colspan="7"><ul>${b.bad.map(t => '<li>' + E(t) + '</li>').join('')}</ul></td></tr>` : ''}`; }).join('');
+    P.ov('정확도 점검', `<div class="bt"><p class="bt-lead">3D로 만든 도면마다 <b>도면 BOM</b>(도면에서 읽은 자재표)과 3D 자재를 맞춰 본 결과입니다. 도면 BOM 글자를 잘못 읽은 경우도 차이로 나오니, 차이 항목은 도면과 함께 확인하세요.</p>
+${fs.length ? `<div class="bt-sum"><div><b>${fs.length}</b><span>도면</span></div><div><b>${P1(T.ok, cmp)}</b><span>부품 수 일치 (${T.ok}/${cmp} 품목 · 가스켓·볼트 제외)</span></div><div><b>${P1(T.pk, T.pn)}</b><span>배관 길이 일치</span></div><div><b>${T.en ? T.e + '/' + T.en : '—'}</b><span>엘보 수·각도 일치</span></div><div><b>${P1(T.l.ocr + T.l.fit, T.l.n)}</b><span>치수 근거 있음 (도면 ${P1(T.l.ocr, T.l.n)} · ASME ${P1(T.l.fit, T.l.n)})</span></div><div class="${T.l.est ? 'w' : ''}"><b>${T.l.est}</b><span>어림값 구간</span></div></div>
+<table class="btt"><thead><tr><th>도면</th><th>부품 일치</th><th>배관 길이</th><th>엘보 (3D / BOM)</th><th>치수: 도면</th><th>ASME</th><th>어림값</th></tr></thead><tbody>${rows}</tbody></table>
+<p class="mut">부품 일치 = 품목·크기별 수량이 도면 BOM과 같은 비율 (배관은 길이로 따로, 가스켓·볼트는 플랜지를 따라가므로 제외). 배관 길이는 BOM이 구매 길이(올림)라 3D가 조금 짧아도 같음으로 봅니다. 엘보는 90°·45° 개수.</p>
+<div class="row bt-ft"><button data-att="back">← 첨부 목록</button>${B && !B.run ? '<button data-bt="res">← 일괄 변환 결과</button>' : ''}<span style="flex:1"></span><button data-bt="csv">CSV로 저장</button></div>` : '<p class="mut">아직 점검할 도면이 없습니다. 도면을 3D로 만들면 여기에 쌓입니다.</p><div class="row bt-ft"><button data-att="back">← 첨부 목록</button></div>'}</div>`, true);
+    accReport.fs = fs;
+  }
+  function accCsv() {
+    const fs = accReport.fs || [], q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const L = [['도면', '라인 번호', '부품 일치 품목', '부품 차이', '도면에 없음', '배관 길이 일치', '배관 품목', '3D 90°', '3D 45°', 'BOM 90°', 'BOM 45°', '구간', '치수: 도면', 'ASME', '직접', '어림값', '차이 내용'].map(q).join(',')];
+    fs.forEach(f => { const a = f.acc, b = a.bom || {}, e = b.elb || { m: {}, d: {} }, p = b.pipe || {}; L.push([f.name, a.ln, b.ok, b.diff, b.extra, p.ok, p.n, e.m[90], e.m[45], e.d[90], e.d[45], a.len.n, a.len.ocr, a.len.fit, a.len.user, a.len.est, (b.bad || []).join(' / ')].map(q).join(',')); });
+    P.dlFile('정확도점검.csv', new Blob(['﻿' + L.join('\r\n')], { type: 'text/csv' }));
+  }
+  document.getElementById('isob').addEventListener('click', e => {
+    const b = e.target.closest('[data-bt]'); if (!b) return;
+    const [k, x, y] = b.dataset.bt.split(':');
+    if (k === 'go') { const ids = [...document.querySelectorAll('.btck:checked')].map(c => c.value); if (ids.length) batchRun(ids); return; }
+    if (k === 'stop' && B) { B.stop = true; b.textContent = '멈추는 중…'; return; }
+    if (k === 'open') { bOpen(+x); return; }
+    if (k === 'fix') { bOpen(+x, +y); return; }
+    if (k === 'acc') { accReport(); return; }
+    if (k === 'res') { bBack(); return; }
+    if (k === 'csv') { accCsv(); return; }
+    if (k === 'see' && B) { P.focus(P.getObjs().filter(o => B.list.some(it => o.src === 'iso:' + it.id)).map(o => o.id)); return; }
+  });
+  const bcss = document.createElement('style');
+  bcss.textContent = `#wzhid{position:fixed;left:-30000px;top:0;width:1150px;pointer-events:none}
+.bt{max-width:1150px;margin:0 auto}.bt-lead{color:#334155;line-height:1.55;margin:0 0 14px}
+#iso .btt{width:100%;max-width:none;border-collapse:collapse;font-size:14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-top:0;border-collapse:separate;border-spacing:0}#iso .btt th{border:0;background:#f8fafc;color:#475569;font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;white-space:nowrap}#iso .btt td{padding:9px 10px;border:0;border-top:1px solid #f1f5f9;vertical-align:top}#iso .btt td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}#iso .btt td.nw{white-space:nowrap;text-align:right}#iso .btt tr.on td{background:#f0fdfa}
+.bt-n{font-weight:600;color:#0f172a;word-break:break-all}.bt-err{color:#b91c1c;font-size:13px;margin-top:2px}#iso .btt .bad{color:#b91c1c}
+#iso .bt-fl td{border-top:0!important;padding-top:0!important;background:#fffbeb}#iso .bt-fl ul{margin:0;padding:4px 0 8px 16px;font-size:13px;color:#78350f;line-height:1.7}#iso .bt-fl .lnk{background:none;border:0;padding:0;color:#0f766e;font-weight:600;text-decoration:underline;cursor:pointer;font-size:13px;min-width:0}
+.bdg{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#475569;white-space:nowrap}.bdg.ok{background:#dcfce7;color:#166534}.bdg.warn{background:#fef3c7;color:#92400e}.bdg.bad{background:#fee2e2;color:#991b1b}.bdg.run{background:#ccfbf1;color:#115e59}
+.bt-hd{display:flex;align-items:center;gap:12px;margin:0 0 12px}.bt-hd .wzbar{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}.bt-hd .wzbar i{display:block;height:100%;background:#0f766e;transition:width .4s}
+.bt-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 14px}.bt-sum>div{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}.bt-sum b{display:block;font-size:22px;color:#0f172a;font-variant-numeric:tabular-nums}.bt-sum span{font-size:12px;color:#64748b}.bt-sum .w b{color:#b45309}
+.bt-ft{margin-top:14px;gap:8px}.bt button.ghost{background:#f8fafc;color:#334155}
+@media(max-width:760px){#iso .btt th:nth-child(5),#iso .btt td:nth-child(5),#iso .btt th:nth-child(6),#iso .btt td:nth-child(6){display:none}}`;
+  document.head.appendChild(bcss);
+
+  window.P3DX = { _wz: () => W, _B: () => B, batchPick, accReport, wizard, convert, table, settings, manual, buildRoute, SYS, _aiRead: aiRead, _tiles: tiles };
 })();
