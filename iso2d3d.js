@@ -168,6 +168,9 @@ RULES
         if (s.equip) placeEquip(s.equip, P0, dir, nps, ri, -1);
         const f = mk('flange', { pos: R1(add3(P0, dir, P.HGx(+R.cls || 150, 'RF', nps))), axis: dir, nps, kind: 'wn', face: 'RF' });
         st.cur = add3(f.pos, dir, f.len);
+      } else if (r.startFl) { // 시작 끝의 플랜지 (다른 장·장치와 맞대는 면)
+        const f = mk('flange', { pos: R1(add3(P0, dir, P.HGx(+R.cls || 150, 'RF', nps))), axis: dir, nps, kind: 'wn', face: 'RF', ext: true });
+        st.cur = add3(f.pos, dir, f.len);
       }
       const pipeTo = (pt, si) => {
         const d = P.DIR[st.dir];
@@ -271,7 +274,7 @@ RULES
             const en = p.end || 'open';
             if (en === 'blind' || en === 'flange') {
               const h = P.HGx(+R.cls || 150, 'RF', st.nps), pr = { nps: st.nps, kind: 'wn', face: 'RF' };
-              const f1 = mk('flange', Object.assign({ pos: R1(add3(C, d, -h)), axis: neg(d) }, pr));
+              const f1 = mk('flange', Object.assign({ pos: R1(add3(C, d, -h)), axis: neg(d) }, pr, en === 'flange' ? { ext: true } : {}));
               pipeTo(add3(f1.pos, neg(d), f1.len), si);
               if (en === 'blind') { const b = mk('flange', Object.assign({ pos: R1(add3(C, d, h)), axis: d }, pr, { kind: 'bl' })); b.len = P.dflen(b); }
             } else {
@@ -689,6 +692,32 @@ RULES
   const QS = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24];
   const phasesOf = s => (s.roll && !s.okRoll ? ['roll'] : []).concat(s.roll && s.okRoll && s.roll.pl !== 'AX' && !s.okSlope ? ['slope'] : []).concat(['flange', 'valve'].includes(s.t) && !s.okType ? ['type'] : []).concat(s.t === 'valve' && s.okType && !s.okVsize ? ['vsize'] : []).concat(s.t === 'reducer' && !s.okRed ? ['rsize'] : []).concat(s.t === 'tee' && !s.okBranch ? ['branch'] : []).concat(s.okLen ? [] : ['len']).concat(s.t === 'end' && !s.okEnd ? ['end'] : []);
   // 이 지점에서의 배관 크기 (런 크기 → 앞쪽 레듀서 반영)
+  // 도면 BOM에서 남는 캡·블라인드·플랜지로 배관 끝 처리 추정
+  function bomEndGuess(ri, si) {
+    const bm = W.bom; if (!bm || !bm.rows || !bm.rows.length) return null;
+    const z = +npsAt(ri, si), eq = a => a != null && Math.abs(+a - z) < 0.01;
+    const q = re => bm.rows.filter(r => re.test(r.cat) && eq(r.size)).reduce((a, r) => a + (+r.qty || 0), 0);
+    let cap = 0, bl = 0, fl = 0;
+    W.R.runs.forEach((r, i) => { if (r.startFl && eq(npsAt(i, 0))) fl++; r.steps.forEach((s, j) => {
+      if (i === ri && j === si) return; if (!eq(npsAt(i, j))) return;
+      if (s.t === 'flange') fl += 2; else if (s.t === 'valve' && (s.conn || 'flg') === 'flg') fl += 2;
+      else if (s.t === 'end' && (s.okEnd || s.guess)) { const en = s.okEnd ? s.end : s.guess; if (en === 'cap') cap++; else if (en === 'blind') { bl++; fl++; } else if (en === 'flange') fl++; }
+    }); });
+    if (q(/^CAP$/) > cap) return 'cap';
+    const me = W.R.runs[ri].steps[si], tickElse = !me.flTick && W.R.runs.some((r, i) => r.steps.some((x, j) => (i !== ri || j !== si) && x.t === 'end' && !x.okEnd && x.flTick && eq(npsAt(i, j))));
+    if (q(/^BLIND FLANGE$/) > bl && !(tickElse && q(/^FLANGE$/) - fl >= 1)) return 'blind'; // 블라인드는 끝에 플랜지 표시가 있는 쪽에 먼저
+    if (q(/^FLANGE$/) - fl >= 1) return 'flange';
+    return null;
+  }
+  // 도면 BOM에 있는 더 작은 크기 (가지·레듀서 크기 추정)
+  function bomSmaller(cur, red) {
+    const bm = W.bom; if (!bm || !bm.rows) return null;
+    const eq = (a, b) => Math.abs(+a - +b) < 0.01;
+    if (red) { const r = bm.rows.find(r => r.cat === 'REDUCER' && r.size2 && eq(r.size, cur) && +r.size2 < cur); if (r) return +r.size2; }
+    else { const t = bm.rows.find(r => r.cat === 'TEE' && r.size2 && eq(r.size, cur) && +r.size2 < cur); if (t) return +t.size2; }
+    const zs = [...new Set(bm.rows.filter(r => r.size && +r.size < cur - 0.01 && !/^(PIPE|GASKET|STUD\/BOLT)$/.test(r.cat)).map(r => +r.size))];
+    return zs.length === 1 ? zs[0] : null;
+  }
   function npsAt(ri, si) {
     const R = W.R, r = R.runs[ri]; let n = +r.nps || +R.nps || 4;
     r.steps.slice(0, si).forEach(x => { if (x.t === 'reducer' && +x.nps2) n = +x.nps2; });
@@ -932,14 +961,16 @@ RULES
         pts = [s._p];
         const cur = npsAt(q.ri, q.si);
         title = branchNote + `레듀서로 보입니다. ${nf(cur)}에서 몇 인치로 바뀌나요?`;
-        const smaller = QS.filter(v => v < cur).reverse(), bigger = QS.filter(v => v > cur).slice(0, 3);
-        body = `<div class="wzb">${smaller.map((v, i) => btn('rs:' + v, nf(cur) + ' → ' + nf(v), i === 0 ? 'on' : '')).join('')}${bigger.map(v => btn('rs:' + v, nf(cur) + ' → ' + nf(v) + ' (커짐)', 'ghost')).join('')}</div>
+        const smaller = QS.filter(v => v < cur).reverse(), bigger = QS.filter(v => v > cur).slice(0, 3), bz = bomSmaller(cur, true), pick = bz != null && smaller.includes(bz) ? bz : smaller[0];
+        if (bz != null) title += ` <span class="wzt">도면 BOM: ${nf(cur)} × ${nf(bz)} 레듀서</span>`;
+        body = `<div class="wzb">${smaller.map(v => btn('rs:' + v, nf(cur) + ' → ' + nf(v), v === pick ? 'on' : '')).join('')}${bigger.map(v => btn('rs:' + v, nf(cur) + ' → ' + nf(v) + ' (커짐)', 'ghost')).join('')}</div>
         <div class="wzb">${btn('rt:conc', '동심 (CONC)', (s.rt || 'conc') === 'conc' ? 'on' : 'ghost')}${btn('rt:ecc', '편심 (ECC)', s.rt === 'ecc' ? 'on' : 'ghost')}${btn('rs:none', '레듀서 아님', 'ghost')}</div>`;
       } else if (q.phase === 'branch') {
         pts = [s._p];
         title = branchNote + '여기서 배관이 갈라집니다. 갈라지는 쪽 배관 크기는?';
-        const cur = npsAt(q.ri, q.si);
-        body = `<div class="wzb">${btn('br:' + cur, '같은 크기 (' + nf(cur) + ')', 'on')}${QS.filter(v => v < cur).reverse().map(v => btn('br:' + v, nf(v))).join('')}${btn('br:none', '갈라지는 곳 아님', 'ghost')}</div>`;
+        const cur = npsAt(q.ri, q.si), bz = bomSmaller(cur, false);
+        if (bz != null) title += ` <span class="wzt">도면 BOM에 ${nf(bz)} 자재가 있습니다</span>`;
+        body = `<div class="wzb">${btn('br:' + cur, '같은 크기 (' + nf(cur) + ')', bz == null ? 'on' : '')}${QS.filter(v => v < cur).reverse().map(v => btn('br:' + v, nf(v), v === bz ? 'on' : '')).join('')}${btn('br:none', '갈라지는 곳 아님', 'ghost')}</div>`;
       } else if (q.phase === 'len') {
         pts = [prev, s._p]; mode = 'seg';
         const what = { elbow: '꺾이는 곳', flange: '플랜지', valve: '밸브 중심', tee: '갈라지는 곳', tee_in: '만나는 곳', reducer: '레듀서', end: '배관 끝', equip: '장치 노즐', inst: '계기' }[s.t] || '다음 지점';
@@ -950,8 +981,8 @@ RULES
         <div class="wzno"><span>파란 띠가 배관이 아닌가요?</span>${btn('cut', '✕ 이 구간은 배관이 아님 (점선·치수선 등)', 'warn')}</div>`;
       } else if (q.phase === 'end') {
         pts = [s._p];
-        const le = symGuess(q.ri, q.si, 'end'), ge = le ? le.v : s.guess;
-        const eg = le ? '지난번 비슷한 모양을 "' + (ENDK[le.v] || le.v) + '"(으)로 고르셨습니다' : { cap: '캡 모양(ㄷ)이 보입니다', flange: '밸브 바로 끝 — 플랜지로 계기·장치에 연결될 가능성' }[s.guess];
+        const le = symGuess(q.ri, q.si, 'end'), bg0 = !le && s.guess !== 'cap' ? bomEndGuess(q.ri, q.si) : null, bg = bg0 && (!s.guess || (s.flTick && (bg0 === 'cap' || bg0 === 'blind'))) ? bg0 : null, ge = le ? le.v : bg || s.guess;
+        const eg = le ? '지난번 비슷한 모양을 "' + (ENDK[le.v] || le.v) + '"(으)로 고르셨습니다' : bg ? '도면 BOM에 아직 안 쓴 ' + ({ cap: '캡', blind: '블라인드 플랜지', flange: '플랜지' }[bg]) + '가 있습니다' : s.flTick ? '끝에 플랜지 표시가 보입니다 — 다른 장·장치와 맞대는 면' : { cap: '캡 모양(ㄷ)이 보입니다', flange: '밸브 바로 끝 — 플랜지로 계기·장치에 연결될 가능성' }[s.guess];
         title = branchNote + '배관이 여기서 끝납니다. 끝은 어떻게 되나요?' + (eg ? ' <span class="wzt' + (le ? ' wzto' : '') + '">' + E(eg) + '</span>' : '');
         const eo = v => (ge === v ? 'on' : '');
         body = `<div class="wzb">${btn('end:open', '기존 배관에 연결 / 용접', eo('open'))}${btn('end:cap', '캡', eo('cap'))}${btn('end:blind', '블라인드 플랜지', eo('blind'))}${btn('end:flange', '플랜지 (열림)', eo('flange'))}${btn('end:pump', '펌프', eo('pump'))}${btn('end:vessel', '베셀·탑', eo('vessel'))}${btn('end:drum', '드럼', eo('drum'))}${btn('end:hx', '열교환기', eo('hx'))}</div><div class="row wzs"><label>장치 번호 (장치일 때) <input id="wztag" placeholder="예: P-101A"></label></div>`;
@@ -1415,7 +1446,7 @@ ${b.errs.length ? `<p class="mut">맞지 않는 곳이 ${b.errs.length}군데 �
       else if (q.phase === 'type') { if (!a) { a = 'type:flange'; why = '표시 종류를 모름 — 플랜지로 봄'; } }
       else if (q.phase === 'end') { if (!a) { a = 'end:open'; why = '배관 끝 처리를 모름 — 기존 배관 연결로 봄'; } }
       else if (q.phase === 'rsize') why = '레듀서 크기 추정 — ' + (a ? a.split(':')[1] + '"' : '');
-      else if (q.phase === 'branch') why = '가지 배관 크기 — 본관과 같다고 봄';
+      else if (q.phase === 'branch') why = a && a !== 'br:' + npsAt(q.ri, q.si) ? '가지 배관 크기 — 도면 BOM 보고 ' + a.split(':')[1] + '"로 봄' : '가지 배관 크기 — 본관과 같다고 봄';
       if (!a) { flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why: '자동으로 답하지 못함' }); break; }
       if (why) flags.push({ ri: q.ri, si: q.si, ph: q.phase, at, why });
       const sig = JSON.stringify(W.q) + '|' + W.hist.length;
@@ -1473,7 +1504,7 @@ ${fs.length ? `<table class="btt"><thead><tr><th style="width:36px"><input type=
 <td class="nw">${x.st === 'ok' ? `<button data-bt="open:${i}" class="ghost">${x.flags.length ? '확인하기' : '열기'}</button>` : ''}</td></tr>${x.st === 'ok' && x.flags.length ? `<tr class="bt-fl"><td></td><td colspan="7"><ul>${fGroup(x.flags).map(g => `<li>${g.js.map(j => `<button class="lnk" data-bt="fix:${i}:${j}">${E(x.flags[j].at)}</button>`).join(' ')} ${E(g.why)}</li>`).join('')}</ul></td></tr>` : ''}`;
     const head = B.run ? `<div class="bt-hd"><div class="wzbar"><i style="width:${prog}%"></i></div><span class="mut">${cur + 1} / ${L.length}</span><button data-bt="stop" class="ghost">${B.stop ? '멈추는 중…' : '멈추기'}</button></div>`
       : `<div class="bt-sum"><div><b>${done.length}</b><span>3D 완료</span></div><div><b>${L.filter(x => x.st === 'fail').length}</b><span>실패</span></div><div class="${nf2 ? 'w' : ''}"><b>${nf2}</b><span>확인 필요</span></div><div><b>${done.reduce((a, x) => a + x.n, 0)}</b><span>부품</span></div><div><b>${done.filter(x => x.placed).length}</b><span>이어 붙임</span></div></div>`;
-    return `<div class="bt">${head}<table class="btt"><thead><tr><th>#</th><th>도면</th><th>라인 번호</th><th>부품</th><th>이음</th><th>클래스</th><th>상태</th><th></th></tr></thead><tbody>${L.map(row).join('')}</tbody></table>
+    return `<div class="bt">${head}<table class="btt"><thead><tr><th class="num">#</th><th>도면</th><th>라인 번호</th><th class="num">부품</th><th>이음</th><th>클래스</th><th>상태</th><th></th></tr></thead><tbody>${L.map(row).join('')}</tbody></table>
 ${B.run ? '<p class="mut">도면마다 치수·BOM 글자를 읽느라 한 장에 수십 초 걸립니다. 이 창을 닫지 마세요.</p>' : `<p class="mut">확인 필요 항목을 누르면 그 질문으로 바로 가고, 답하면 검토 화면으로 돌아옵니다. 검토 화면에서 "3D로 만들기"를 누르면 그 장만 다시 만듭니다.</p>
 <div class="row bt-ft"><button data-att="back">← 첨부 목록</button><span style="flex:1"></span><button data-bt="acc" class="ghost">📊 정확도 점검</button><button data-bt="see" class="pri">3D로 보기</button></div>`}</div>`;
   }
@@ -1498,7 +1529,7 @@ ${B.run ? '<p class="mut">도면마다 치수·BOM 글자를 읽느라 한 장�
       return `<tr><td><div class="bt-n">${E(f.name)}</div><div class="mut">${E(a.ln || '')}</div></td><td class="num">${b ? P1(b.ok, c) : '<span class="mut">BOM 없음</span>'}</td><td class="num">${b ? (b.pipe.n ? b.pipe.ok + '/' + b.pipe.n : '—') : ''}</td><td class="num">${b ? (b.elb.m[90] === b.elb.d[90] && b.elb.m[45] === b.elb.d[45] && !b.elb.m.x ? '✓' : `<span class="bad">${b.elb.m[90]}·${b.elb.m[45]} / ${b.elb.d[90]}·${b.elb.d[45]}</span>`) : ''}</td><td class="num">${P1(l.ocr, l.n)}</td><td class="num">${P1(l.fit, l.n)}</td><td class="num">${l.est ? '<span class="bad">' + l.est + '</span>' : '0'}</td></tr>${b && b.bad.length ? `<tr class="bt-fl"><td colspan="7"><ul>${b.bad.map(t => '<li>' + E(t) + '</li>').join('')}</ul></td></tr>` : ''}`; }).join('');
     P.ov('정확도 점검', `<div class="bt"><p class="bt-lead">3D로 만든 도면마다 <b>도면 BOM</b>(도면에서 읽은 자재표)과 3D 자재를 맞춰 본 결과입니다. 도면 BOM 글자를 잘못 읽은 경우도 차이로 나오니, 차이 항목은 도면과 함께 확인하세요.</p>
 ${fs.length ? `<div class="bt-sum"><div><b>${fs.length}</b><span>도면</span></div><div><b>${P1(T.ok, cmp)}</b><span>부품 수 일치 (${T.ok}/${cmp} 품목 · 가스켓·볼트 제외)</span></div><div><b>${P1(T.pk, T.pn)}</b><span>배관 길이 일치</span></div><div><b>${T.en ? T.e + '/' + T.en : '—'}</b><span>엘보 수·각도 일치</span></div><div><b>${P1(T.l.ocr + T.l.fit, T.l.n)}</b><span>치수 근거 있음 (도면 ${P1(T.l.ocr, T.l.n)} · ASME ${P1(T.l.fit, T.l.n)})</span></div><div class="${T.l.est ? 'w' : ''}"><b>${T.l.est}</b><span>어림값 구간</span></div></div>
-<table class="btt"><thead><tr><th>도면</th><th>부품 일치</th><th>배관 길이</th><th>엘보 (3D / BOM)</th><th>치수: 도면</th><th>ASME</th><th>어림값</th></tr></thead><tbody>${rows}</tbody></table>
+<table class="btt"><thead><tr><th>도면</th><th class="num">부품 일치</th><th class="num">배관 길이</th><th class="num">엘보 (3D / BOM)</th><th class="num">치수: 도면</th><th class="num">ASME</th><th class="num">어림값</th></tr></thead><tbody>${rows}</tbody></table>
 <p class="mut">부품 일치 = 품목·크기별 수량이 도면 BOM과 같은 비율 (배관은 길이로 따로, 가스켓·볼트는 플랜지를 따라가므로 제외). 배관 길이는 BOM이 구매 길이(올림)라 3D가 조금 짧아도 같음으로 봅니다. 엘보는 90°·45° 개수.</p>
 <div class="row bt-ft"><button data-att="back">← 첨부 목록</button>${B && !B.run ? '<button data-bt="res">← 일괄 변환 결과</button>' : ''}<span style="flex:1"></span><button data-bt="csv">CSV로 저장</button></div>` : '<p class="mut">아직 점검할 도면이 없습니다. 도면을 3D로 만들면 여기에 쌓입니다.</p><div class="row bt-ft"><button data-att="back">← 첨부 목록</button></div>'}</div>`, true);
     accReport.fs = fs;
@@ -1524,7 +1555,7 @@ ${fs.length ? `<div class="bt-sum"><div><b>${fs.length}</b><span>도면</span></
   const bcss = document.createElement('style');
   bcss.textContent = `#wzhid{position:fixed;left:-30000px;top:0;width:1150px;pointer-events:none}
 .bt{max-width:1150px;margin:0 auto}.bt-lead{color:#334155;line-height:1.55;margin:0 0 14px}
-#iso .btt{width:100%;max-width:none;border-collapse:collapse;font-size:14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-top:0;border-collapse:separate;border-spacing:0}#iso .btt th{border:0;background:#f8fafc;color:#475569;font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;white-space:nowrap}#iso .btt td{padding:9px 10px;border:0;border-top:1px solid #f1f5f9;vertical-align:top}#iso .btt td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}#iso .btt td.nw{white-space:nowrap;text-align:right}#iso .btt tr.on td{background:#f0fdfa}
+#iso .btt{width:100%;max-width:none;border-collapse:collapse;font-size:14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-top:0;border-collapse:separate;border-spacing:0}#iso .btt th{border:0;background:#f8fafc;color:#475569;font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;white-space:nowrap}#iso .btt td{padding:9px 10px;border:0;border-top:1px solid #f1f5f9;vertical-align:top}#iso .btt th.num,#iso .btt td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}#iso .btt td.nw{white-space:nowrap;text-align:right}#iso .btt tr.on td{background:#f0fdfa}
 .bt-n{font-weight:600;color:#0f172a;word-break:break-all}.bt-err{color:#b91c1c;font-size:13px;margin-top:2px}#iso .btt .bad{color:#b91c1c}
 #iso .bt-fl td{border-top:0!important;padding-top:0!important;background:#fffbeb}#iso .bt-fl ul{margin:0;padding:4px 0 8px 16px;font-size:13px;color:#78350f;line-height:1.7}#iso .bt-fl .lnk{background:none;border:0;padding:0;color:#0f766e;font-weight:600;text-decoration:underline;cursor:pointer;font-size:13px;min-width:0}
 .bdg{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#475569;white-space:nowrap}.bdg.ok{background:#dcfce7;color:#166534}.bdg.warn{background:#fef3c7;color:#92400e}.bdg.bad{background:#fee2e2;color:#991b1b}.bdg.run{background:#ccfbf1;color:#115e59}

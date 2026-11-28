@@ -196,7 +196,7 @@
       const lang = LINES.find(x => x[0] === l.ax)[1];
       const marks = [];
       shortS.forEach(s => {
-        const sp = onLine(l, s.m, 7); if (sp == null || sp < l.s0 + 2 || sp > l.s1 - 2) return;
+        const sp = onLine(l, s.m, 7); if (sp == null || sp < l.s0 - 4 || sp > l.s1 + 4) return; // 끝 바로 위 플랜지 표시도 모음
         const cross = angDiff(s.ang, lang) > 20;
         const oa = s.a[0] * l.n[0] + s.a[1] * l.n[1] - l.off, ob = s.b[0] * l.n[0] + s.b[1] * l.n[1] - l.off;
         const straddle = (oa * ob < 0) || Math.abs(oa) < 0.8 || Math.abs(ob) < 0.8;
@@ -209,9 +209,10 @@
       cl.forEach(c => {
         const axc = c.items.filter(m => m.cross && m.straddle && m.ax && m.ax !== l.ax && m.len >= 4), diag = c.items.filter(m => !m.ax && m.straddle && m.len >= 2.5);
         const s = (c.b + c.e) / 2, span = c.e - c.b;
-        if (s < l.s0 + 5 || s > l.s1 - 5) return;
+        if (s < l.s0 - 3 || s > l.s1 + 3) return;
         const fp = P(l, s);
         if (pipes.some(m => m !== l && ([m.a, m.b].some(e => dist(e, fp) < 8) || (m.ax !== l.ax && onL(m, fp, 2.5))))) return;
+        if (s < l.s0 + 5 || s > l.s1 - 5) { if (axc.length >= 2 && span < 7 && !diag.length) (l.endFl = l.endFl || []).push(fp); return; } // 배관 끝의 플랜지 (다른 장·장치로 이어짐)
         if (diag.length >= 2) l.feats.push({ t: 'valve', s });
         else if (axc.length >= 2 && span < 7) l.feats.push({ t: 'flange', s });
       });
@@ -219,6 +220,25 @@
       (l.gaps || []).forEach(([g0, g1]) => { const s = (g0 + g1) / 2; if (!l.feats.some(f => Math.abs(f.s - s) < 10)) l.feats.push({ t: 'valve', s, guess: true }); });
       l.feats.sort((p, q) => p.s - q.s);
     });
+    // 배관 끝(다른 배관이 안 닿는 끝) 바로 너머의 플랜지 표시 (끝 쪽 선이 짧아 기호로 분류된 경우까지)
+    pipes.forEach(l => {
+      const lang = LINES.find(x => x[0] === l.ax)[1];
+      [[l.s0, -1], [l.s1, 1]].forEach(([se, sg]) => {
+        const ep = P(l, se);
+        if (pipes.some(m => m !== l && ([m.a, m.b].some(e => dist(e, ep) < 6) || (m.ax !== l.ax && onL(m, ep, 2.5))))) return;
+        if ((l.endFl || []).some(q => dist(q, ep) < 9)) return;
+        const ms = shortS.filter(q => {
+          const t = (q.m[0] * l.u[0] + q.m[1] * l.u[1] - se) * sg; if (t < -8 || t > 12) return false;
+          const oa = q.a[0] * l.n[0] + q.a[1] * l.n[1] - l.off, ob = q.b[0] * l.n[0] + q.b[1] * l.n[1] - l.off;
+          if (angDiff(q.ang, lang) < 20 || q.len < 1.5) return false;
+          q._st = oa * ob < 0; if (!q._st && Math.max(Math.abs(oa), Math.abs(ob)) > 6) return false; // 점선 조각(다른 장 플랜지)도 셈
+          const ax = (LINES.find(([, t2]) => angDiff(q.ang, t2) < 4) || [null])[0]; return ax && ax !== l.ax;
+        });
+        const sv = ms.map(q => q.m[0] * l.u[0] + q.m[1] * l.u[1]).sort((x, y) => x - y);
+        if (ms.length >= 2 && ms.some(q => q._st && q.len >= 3.5) && sv[sv.length - 1] - sv[0] < 7) (l.endFl = l.endFl || []).push(ep);
+      });
+    });
+
     // 아이소 밸브(나비꼴 ⋈): 아이소 축(30/90/150°)이 아닌 빗선 2개 이상이 배관 축을 가로지르는 곳
     const isoAng = a => [30, 90, 150].some(t => angDiff(a, t) < 4);
     const slant = segs.filter(q => !q.isFill).map(([a, b]) => ({ a, b, len: dist(a, b), ang: deg(b[0] - a[0], b[1] - a[1]) })).filter(q => q.len >= 7 && q.len < 25 && !isoAng(q.ang)); // 용접 끝 작은 삼각형(7pt 미만)은 제외
@@ -532,7 +552,7 @@
         const rl = e.l.roll ? Object.assign({}, e.l.roll, { fw: dist(node.p, e.l.a) < dist(node.p, e.l.b) }) : null;
         if (rl && !rl.fw) { rl.key = negD(rl.key); rl.alts = Object.fromEntries(Object.entries(rl.alts).map(([k, v]) => [k, negD(v)])); rl.pq = Object.fromEntries(Object.entries(rl.pq || {}).map(([k, v]) => [k, Object.assign({}, v, { a: -v.a, b: -v.b })])); }
         if (rl) delete rl.C;
-        if (!dir) { dir = d; run.dir = d; if (rl) run.roll = rl; }
+        if (!dir) { dir = d; run.dir = d; if (rl) run.roll = rl; if (q.start === 'origin' && node.edges.length === 1 && (e.l.endFl || []).some(p => dist(p, node.p) < 9)) run.startFl = true; }
         else if (d !== dir) { const el = { t: 'elbow', to: d, conf: 'low' }; if (rl) el.roll = rl; if (prevRoll || rl) el.e45 = true; put(el, node.p); dir = d; }
         prevRoll = rl; inRoll = rl;
         // 구간 안 기호(진행 방향 순서)
@@ -543,6 +563,7 @@
         if (!rest.length) {
           const st = { t: 'end', end: 'open', conf: 'low' };
           if ((A.caps || []).some(c => dist(c, node.p) < 6)) st.guess = 'cap';
+          else if ((e.l.endFl || []).some(q => dist(q, node.p) < 9)) { st.guess = 'flange'; st.flTick = true; }
           else if ((A.valves || []).some(v => dist(v, node.p) < 14)) st.guess = 'flange'; // 밸브 바로 끝 = 플랜지로 계기·장치에 연결
           put(st, node.p); break;
         }

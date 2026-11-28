@@ -198,7 +198,7 @@ function bomItems(set,dme,js,ids){
   else if(t==='trap')add('STEAM TRAP',z,`${x.spec?x.spec+' ':''}${cl}# ${x.conn==='bw'?'BW':'RFSF'}`,1);
   else if(t==='flange'){const kd=x.kind||'wn';add(kd==='bl'?'BLIND FLANGE':'FLANGE',z,`${x.spec||dme.fls} ${cl}# ${KC[kd]?KC[kd]+' '+dme.sch+' ':''}${FC[x.face||'RF']}${x.face==='RTJ'&&ringNo(x.nps,cl)?' (R-'+ringNo(x.nps,cl)+')':''}`,1)}});
  objs.filter(x=>x.type==='support'&&ids.includes(x.host)).forEach(x=>add('PIPE SUPPORT',nf(x.nps),SKC[x.sk||'shoe']+(x.sk==='hanger'?' ROD L='+(x.h||600):''),1));
- js.forEach(j=>{const g=jget(j),nb=fl(j.nps,j.cls)[2],bd=bdia(j.nps,j.cls);add('GASKET',nf(j.nps),`${g.mt||GKE[g.g]}${g.g==='rtj'&&ringTxt(j)?' '+ringTxt(j):''} ${j.cls}#${!g.mt&&g.g==='swg'?' IR-316SS & OR-CS':''}`,1);add('STUD/BOLT',bd+'"X'+fmtIn(studIn(j)),g.bt||dme.bs,nb)});
+ js.forEach(j=>{const g=jget(j),nb=fl(j.nps,j.cls)[2],bd=bdia(j.nps,j.cls);add('GASKET',nf(j.nps),`${g.mt||GKE[g.g]}${g.g==='rtj'&&ringTxt(j)?' '+ringTxt(j):''} ${j.cls}#${!g.mt&&g.g==='swg'?' IR-316SS & OR-CS':''}`,1);add('STUD/BOLT',bd+'"X'+fmtIn(studIn(j)),g.bt||dme.bs,nb)});set.filter(x=>x.type==='flange'&&x.ext&&x.kind!=='bl'&&!js.some(j=>j.a===x||j.b===x)).forEach(x=>{const j={id:'ext:'+x.id,a:x,b:x,nps:x.nps,cls:x.cls||150,face:x.face||'RF'},g=jget(j);add('GASKET',nf(j.nps),`${g.mt||GKE[g.g]} ${j.cls}#${!g.mt&&g.g==='swg'?' IR-316SS & OR-CS':''}`,1);add('STUD/BOLT',bdia(j.nps,j.cls)+'"X'+fmtIn(studIn(j)),g.bt||dme.bs,fl(j.nps,j.cls)[2])});
  const items=Object.values(bm).sort((p,q)=>(BOMORD.indexOf(p.code)+1||99)-(BOMORD.indexOf(q.code)+1||99));
  return items}
 let isoPg=0,isoCut=false,isoKeyLast=null,isoSpool=false;
